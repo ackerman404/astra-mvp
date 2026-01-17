@@ -14,9 +14,9 @@ Requirements for latency optimization release.
 
 ### Transcription
 
-- [ ] **TRANS-01**: Default Whisper model switched to tiny.en (~1s for 30s audio)
-- [ ] **TRANS-02**: Transcription uses beam_size=1 for faster inference
-- [ ] **TRANS-03**: VAD filtering enabled (vad_filter=True) to skip silence segments
+- [x] **TRANS-01**: Default Whisper model switched to tiny.en (~1s for 30s audio)
+- [x] **TRANS-02**: Transcription uses beam_size=1 for faster inference
+- [x] **TRANS-03**: VAD filtering enabled (vad_filter=True) to skip silence segments
 
 ### Observability
 
@@ -64,9 +64,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 |-------------|-------|--------|
 | AUDIO-01 | Phase 1 | Complete |
 | AUDIO-02 | Phase 1 | Complete |
-| TRANS-01 | Phase 2 | Pending |
-| TRANS-02 | Phase 2 | Pending |
-| TRANS-03 | Phase 2 | Pending |
+| TRANS-01 | Phase 2 | Complete |
+| TRANS-02 | Phase 2 | Complete |
+| TRANS-03 | Phase 2 | Complete |
 | OBS-01 | Phase 3 | Pending |
 | CONFIG-01 | Phase 3 | Pending |
 
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-17 after Phase 1 completion*
+*Last updated: 2026-01-17 after Phase 2 completion*
