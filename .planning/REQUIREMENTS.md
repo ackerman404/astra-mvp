@@ -9,8 +9,8 @@ Requirements for latency optimization release.
 
 ### Audio Pipeline
 
-- [ ] **AUDIO-01**: Audio captured directly to numpy array in memory (no temp file)
-- [ ] **AUDIO-02**: Numpy array passed directly to faster-whisper transcribe()
+- [x] **AUDIO-01**: Audio captured directly to numpy array in memory (no temp file)
+- [x] **AUDIO-02**: Numpy array passed directly to faster-whisper transcribe()
 
 ### Transcription
 
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIO-01 | Phase 1 | Pending |
-| AUDIO-02 | Phase 1 | Pending |
+| AUDIO-01 | Phase 1 | Complete |
+| AUDIO-02 | Phase 1 | Complete |
 | TRANS-01 | Phase 2 | Pending |
 | TRANS-02 | Phase 2 | Pending |
 | TRANS-03 | Phase 2 | Pending |
@@ -77,4 +77,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-17 after roadmap creation*
+*Last updated: 2026-01-17 after Phase 1 completion*

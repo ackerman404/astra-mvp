@@ -10,7 +10,7 @@ Optimize the audio-to-answer pipeline from ~3-5 seconds down to sub-3-second lat
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 1: Memory Audio Pipeline** - Eliminate temp file I/O, keep audio in numpy arrays
+- [x] **Phase 1: Memory Audio Pipeline** - Eliminate temp file I/O, keep audio in numpy arrays
 - [ ] **Phase 2: Transcription Optimization** - Faster Whisper with tiny.en model and VAD
 - [ ] **Phase 3: Observability & Config** - Timing display and model selection
 
@@ -25,10 +25,10 @@ Optimize the audio-to-answer pipeline from ~3-5 seconds down to sub-3-second lat
   2. Numpy array passed to faster-whisper without intermediate file
   3. Existing functionality still works (transcription produces text)
 **Research**: Unlikely (faster-whisper already supports numpy input)
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 01-01: Memory audio pipeline implementation
+- [x] 01-01: Memory audio pipeline implementation
 
 ### Phase 2: Transcription Optimization
 **Goal**: Faster Whisper inference with tiny.en and VAD
@@ -66,6 +66,6 @@ Phases execute in numeric order: 1 → 2 → 3
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Memory Audio Pipeline | 0/1 | Not started | - |
+| 1. Memory Audio Pipeline | 1/1 | Complete | 2026-01-17 |
 | 2. Transcription Optimization | 0/1 | Not started | - |
 | 3. Observability & Config | 0/1 | Not started | - |
