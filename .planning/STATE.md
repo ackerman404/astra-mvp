@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-17)
 ## Current Position
 
 Phase: 4 of 4 (Windows Compatibility & Easy Setup)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: In progress
-Last activity: 2026-01-20 — Completed 04-01-PLAN.md
+Last activity: 2026-01-20 — Completed 04-02-PLAN.md
 
-Progress: ███████░░░ 75%
+Progress: ████████░░ 80%
 
 ## Performance Metrics
 
@@ -29,10 +29,10 @@ Progress: ███████░░░ 75%
 |-------|-------|-------|----------|
 | 01-memory-audio-pipeline | 1 | ~5 min | ~5 min |
 | 02-transcription-optimization | 1 | ~1 min | ~1 min |
-| 04-windows-compatibility-setup | 1 | ~3 min | ~3 min |
+| 04-windows-compatibility-setup | 2 | ~6 min | ~3 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 02-01, 04-01
+- Last 5 plans: 01-01, 02-01, 04-01, 04-02
 - Trend: Stable
 
 ## Accumulated Context
@@ -46,6 +46,8 @@ Recent decisions affecting current work:
 |-------|----------|-----------|
 | 04-01 | Abstract base class for AudioCapture | Clear interface contract for platform implementations |
 | 04-01 | Factory function for platform detection | Clean abstraction using sys.platform |
+| 04-02 | PyAudioWPatch for Windows WASAPI | Extends PyAudio with loopback support for system audio capture |
+| 04-02 | Version-pinned dependencies | Address CONCERNS.md item #12 with minimum version constraints |
 
 ### Pending Todos
 
@@ -62,7 +64,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 04-01-PLAN.md (Audio abstraction layer)
+Stopped at: Completed 04-02-PLAN.md (Windows audio backend)
 Resume file: None
 
 ## Completed Plans
@@ -72,3 +74,4 @@ Resume file: None
 | 01-01 | Memory Audio Pipeline | Remove temp file I/O from transcription |
 | 02-01 | Transcription Optimization | Switch to tiny.en model |
 | 04-01 | Windows Compatibility Setup | Audio capture abstraction layer + Linux refactor |
+| 04-02 | Windows Compatibility Setup | Windows audio backend (WASAPI via PyAudioWPatch) |

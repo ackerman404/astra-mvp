@@ -74,7 +74,7 @@ Plans:
 
 Plans:
 - [x] 04-01: Audio abstraction layer + Linux refactor
-- [ ] 04-02: Windows audio backend (WASAPI)
+- [x] 04-02: Windows audio backend (WASAPI)
 - [ ] 04-03: Easy setup scripts + packaging
 
 ## Progress
@@ -87,4 +87,4 @@ Phases execute in numeric order: 1 → 2 → 3
 | 1. Memory Audio Pipeline | 1/1 | Complete | 2026-01-17 |
 | 2. Transcription Optimization | 1/1 | Complete | 2026-01-17 |
 | 3. Observability & Config | 0/1 | Not started | - |
-| 4. Windows Compatibility & Easy Setup | 1/3 | In progress | - |
+| 4. Windows Compatibility & Easy Setup | 2/3 | In progress | - |
