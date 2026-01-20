@@ -83,7 +83,8 @@ class StartupScreen(QWidget):
     def _init_ui(self):
         """Set up the startup screen user interface."""
         self.setWindowTitle("Astra Interview Copilot")
-        self.setFixedSize(400, 350)
+        self.setMinimumSize(350, 300)
+        self.resize(400, 350)
         self.setStyleSheet("background-color: #ffffff;")
 
         layout = QVBoxLayout(self)
