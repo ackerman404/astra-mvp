@@ -63,6 +63,12 @@ class SignalBridge(QObject):
     queue_update = pyqtSignal(int)            # Number of queued questions
 
 
+class IngestionSignals(QObject):
+    """Signals for document ingestion progress."""
+    progress = pyqtSignal(dict)  # Progress info dict
+    complete = pyqtSignal(dict)  # Result summary dict
+
+
 class StartupScreen(QWidget):
     """Startup screen with Ingest Documents and Start Session buttons."""
 
@@ -148,6 +154,26 @@ class StartupScreen(QWidget):
         self.start_btn.clicked.connect(self._on_start_session_clicked)
         layout.addWidget(self.start_btn)
 
+        # Progress bar for ingestion (hidden by default)
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setRange(0, 100)
+        self.progress_bar.setValue(0)
+        self.progress_bar.setTextVisible(False)
+        self.progress_bar.setMaximumHeight(20)
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                background-color: #f5f5f5;
+            }
+            QProgressBar::chunk {
+                background-color: #4a90d9;
+                border-radius: 3px;
+            }
+        """)
+        layout.addWidget(self.progress_bar)
+
         # Status label for ingestion feedback
         self.status_label = QLabel("")
         self.status_label.setFont(QFont("Sans", 9))
@@ -175,6 +201,19 @@ class StartupScreen(QWidget):
         """Enable or disable buttons during operations."""
         self.ingest_btn.setEnabled(enabled)
         self.start_btn.setEnabled(enabled)
+
+    def show_progress_bar(self, show: bool):
+        """Toggle progress bar visibility."""
+        self.progress_bar.setVisible(show)
+
+    def set_progress(self, current: int, total: int):
+        """Update progress bar value."""
+        if total > 0:
+            self.progress_bar.setRange(0, total)
+            self.progress_bar.setValue(current)
+        else:
+            self.progress_bar.setRange(0, 100)
+            self.progress_bar.setValue(0)
 
 
 class AstraWindow(QMainWindow):
@@ -1019,7 +1058,6 @@ class AstraApp:
 
     def _on_ingest(self):
         """Handle document ingestion request."""
-        from ingest import ingest_folder
         import os
 
         documents_path = "./documents/"
@@ -1034,7 +1072,14 @@ class AstraApp:
 
         # Disable buttons during ingestion
         self.startup_screen.set_buttons_enabled(False)
-        self.startup_screen.set_status("Ingesting documents...")
+        self.startup_screen.set_status("Scanning documents...")
+        self.startup_screen.show_progress_bar(True)
+        self.startup_screen.set_progress(0, 100)
+
+        # Create ingestion signals for thread-safe UI updates
+        self._ingestion_signals = IngestionSignals()
+        self._ingestion_signals.progress.connect(self._on_ingestion_progress)
+        self._ingestion_signals.complete.connect(self._on_ingestion_complete)
 
         # Run ingestion in background thread
         self._ingest_thread = threading.Thread(
@@ -1044,43 +1089,67 @@ class AstraApp:
         )
         self._ingest_thread.start()
 
-        # Poll for completion using a timer
-        self._check_ingestion_complete()
-
     def _run_ingestion(self, folder_path: str):
-        """Background thread: run document ingestion."""
-        from ingest import ingest_folder
+        """Background thread: run document ingestion with progress reporting."""
+        from ingest import ingest_folder_with_progress
+
+        def progress_callback(info: dict):
+            """Emit progress signal from background thread."""
+            self._ingestion_signals.progress.emit(info)
 
         try:
-            ingest_folder(folder_path)
-            self._ingestion_result = ("success", "Documents ingested successfully!")
+            result = ingest_folder_with_progress(folder_path, progress_callback)
+            self._ingestion_signals.complete.emit(result)
         except Exception as e:
-            self._ingestion_result = ("error", f"Ingestion failed: {e}")
+            self._ingestion_signals.complete.emit({
+                "success": False,
+                "total_files": 0,
+                "total_chunks": 0,
+                "errors": [str(e)]
+            })
 
-    def _check_ingestion_complete(self):
-        """Check if ingestion thread has completed."""
-        if self._ingest_thread and self._ingest_thread.is_alive():
-            # Check again in 100ms
-            QTimer.singleShot(100, self._check_ingestion_complete)
+    def _on_ingestion_progress(self, info: dict):
+        """Handle progress updates from ingestion thread."""
+        stage = info.get("stage", "")
+        total_files = info.get("total_files", 0)
+        current_index = info.get("current_file_index", 0)
+        current_name = info.get("current_file_name", "")
+
+        if stage == "scanning":
+            self.startup_screen.set_status(f"Found {total_files} files")
+            self.startup_screen.set_progress(0, total_files)
+        elif stage == "processing":
+            display_index = current_index + 1
+            self.startup_screen.set_status(
+                f"Processing {current_name} ({display_index} of {total_files})"
+            )
+            self.startup_screen.set_progress(display_index, total_files)
+
+    def _on_ingestion_complete(self, result: dict):
+        """Handle ingestion completion."""
+        self.startup_screen.set_buttons_enabled(True)
+        self.startup_screen.show_progress_bar(False)
+
+        success = result.get("success", False)
+        total_chunks = result.get("total_chunks", 0)
+        errors = result.get("errors", [])
+
+        if success and not errors:
+            message = f"Ingestion complete! {total_chunks} chunks added."
+            self.startup_screen.set_status(message)
+            QMessageBox.information(
+                self.startup_screen,
+                "Ingestion Complete",
+                message
+            )
         else:
-            # Ingestion complete
-            self.startup_screen.set_buttons_enabled(True)
-            if hasattr(self, '_ingestion_result'):
-                status, message = self._ingestion_result
-                self.startup_screen.set_status(message, is_error=(status == "error"))
-                if status == "success":
-                    QMessageBox.information(
-                        self.startup_screen,
-                        "Ingestion Complete",
-                        message
-                    )
-                else:
-                    QMessageBox.warning(
-                        self.startup_screen,
-                        "Ingestion Error",
-                        message
-                    )
-                del self._ingestion_result
+            error_msg = errors[0] if errors else "Unknown error"
+            self.startup_screen.set_status(f"Error: {error_msg}", is_error=True)
+            QMessageBox.warning(
+                self.startup_screen,
+                "Ingestion Error",
+                error_msg
+            )
 
     def _on_start_session(self):
         """Handle start session request."""
