@@ -2,26 +2,26 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-17)
+See: .planning/PROJECT.md (updated 2026-01-20)
 
 **Core value:** Sub-3-second total response time from silence detection to answer display
-**Current focus:** Phase 4 — Windows Compatibility & Easy Setup
+**Current focus:** Milestone v2.0 — GUI & Security
 
 ## Current Position
 
-Phase: 4 of 4 (Windows Compatibility & Easy Setup)
-Plan: 2 of 3 in current phase
-Status: In progress
-Last activity: 2026-01-20 — Completed 04-02-PLAN.md
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-01-20 — Milestone v2.0 started
 
-Progress: ████████░░ 80%
+Progress: ░░░░░░░░░░ 0%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 3
+- Total plans completed: 4
 - Average duration: ~3 min
-- Total execution time: ~9 min
+- Total execution time: ~12 min
 
 **By Phase:**
 
@@ -29,10 +29,10 @@ Progress: ████████░░ 80%
 |-------|-------|-------|----------|
 | 01-memory-audio-pipeline | 1 | ~5 min | ~5 min |
 | 02-transcription-optimization | 1 | ~1 min | ~1 min |
-| 04-windows-compatibility-setup | 2 | ~6 min | ~3 min |
+| 04-windows-compatibility-setup | 3 | ~6 min | ~2 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 02-01, 04-01, 04-02
+- Last 5 plans: 01-01, 02-01, 04-01, 04-02, 04-03
 - Trend: Stable
 
 ## Accumulated Context
@@ -59,12 +59,13 @@ None yet.
 
 ### Roadmap Evolution
 
-- Phase 4 added: Windows Compatibility & Easy Setup
+- v1.0 complete: Phases 1, 2, 4 shipped
+- v2.0 started: GUI improvements & security
 
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed 04-02-PLAN.md (Windows audio backend)
+Stopped at: Milestone v2.0 initialized
 Resume file: None
 
 ## Completed Plans
@@ -75,3 +76,4 @@ Resume file: None
 | 02-01 | Transcription Optimization | Switch to tiny.en model |
 | 04-01 | Windows Compatibility Setup | Audio capture abstraction layer + Linux refactor |
 | 04-02 | Windows Compatibility Setup | Windows audio backend (WASAPI via PyAudioWPatch) |
+| 04-03 | Windows Compatibility Setup | Easy setup scripts + packaging |
