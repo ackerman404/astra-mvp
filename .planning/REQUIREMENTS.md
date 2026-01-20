@@ -49,8 +49,8 @@ Requirements for GUI improvements and security.
 
 ### Window Layout
 
-- [ ] **LAYOUT-01**: Window is resizable (remove fixed size constraint)
-- [ ] **LAYOUT-02**: Support horizontal layout option for wider screens
+- [x] **LAYOUT-01**: Window is resizable (remove fixed size constraint)
+- [x] **LAYOUT-02**: Support horizontal layout option for wider screens
 
 ### Security
 
@@ -90,8 +90,8 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INGEST-01 | Phase 2 (v2) | Complete |
 | INGEST-02 | Phase 2 (v2) | Complete |
 | INGEST-03 | Phase 2 (v2) | Complete |
-| LAYOUT-01 | Phase 3 (v2) | Pending |
-| LAYOUT-02 | Phase 3 (v2) | Pending |
+| LAYOUT-01 | Phase 3 (v2) | Complete |
+| LAYOUT-02 | Phase 3 (v2) | Complete |
 | SEC-01 | Phase 4 (v2) | Pending |
 | SEC-02 | Phase 4 (v2) | Pending |
 | SEC-03 | Phase 4 (v2) | Pending |
@@ -103,4 +103,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-20 after Phase 2 completion*
+*Last updated: 2026-01-20 after Phase 3 completion*
