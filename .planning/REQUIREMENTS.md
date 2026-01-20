@@ -43,9 +43,9 @@ Requirements for GUI improvements and security.
 
 ### Document Ingestion
 
-- [ ] **INGEST-01**: GUI-based document ingestion (no CLI required)
-- [ ] **INGEST-02**: Ingestion scans `documents/` folder in project directory
-- [ ] **INGEST-03**: Progress/status feedback during ingestion process
+- [x] **INGEST-01**: GUI-based document ingestion (no CLI required)
+- [x] **INGEST-02**: Ingestion scans `documents/` folder in project directory
+- [x] **INGEST-03**: Progress/status feedback during ingestion process
 
 ### Window Layout
 
@@ -87,9 +87,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | GUI-01 | Phase 1 (v2) | Complete |
 | GUI-02 | Phase 1 (v2) | Complete |
 | GUI-03 | Phase 1 (v2) | Complete |
-| INGEST-01 | Phase 2 (v2) | Pending |
-| INGEST-02 | Phase 2 (v2) | Pending |
-| INGEST-03 | Phase 2 (v2) | Pending |
+| INGEST-01 | Phase 2 (v2) | Complete |
+| INGEST-02 | Phase 2 (v2) | Complete |
+| INGEST-03 | Phase 2 (v2) | Complete |
 | LAYOUT-01 | Phase 3 (v2) | Pending |
 | LAYOUT-02 | Phase 3 (v2) | Pending |
 | SEC-01 | Phase 4 (v2) | Pending |
@@ -103,4 +103,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-20 after Phase 1 completion*
+*Last updated: 2026-01-20 after Phase 2 completion*
