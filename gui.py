@@ -23,6 +23,8 @@ from PyQt6.QtWidgets import (
     QSlider,
     QFrame,
     QMessageBox,
+    QSplitter,
+    QSizePolicy,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
@@ -234,6 +236,9 @@ class AstraWindow(QMainWindow):
         self.is_processing = False
         self.confidence_threshold = CLASSIFICATION_CONFIDENCE
 
+        # Layout mode state
+        self.horizontal_layout = False
+
         self._init_ui()
         self._connect_signals()
         self._init_capture()
@@ -252,7 +257,8 @@ class AstraWindow(QMainWindow):
     def _init_ui(self):
         """Set up the user interface."""
         self.setWindowTitle("Astra Interview Copilot")
-        self.setFixedSize(500, 750)
+        self.setMinimumSize(450, 600)
+        self.resize(600, 750)
 
         # Central widget and layout
         central = QWidget()
@@ -262,12 +268,38 @@ class AstraWindow(QMainWindow):
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        # Title
+        # Title row with layout toggle button
+        title_layout = QHBoxLayout()
+        title_layout.addStretch()
+
         title = QLabel("Astra Interview Copilot")
         title.setFont(QFont("Sans", 14, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("color: #222222;")
-        layout.addWidget(title)
+        title_layout.addWidget(title)
+
+        title_layout.addStretch()
+
+        # Layout toggle button
+        self.layout_toggle_btn = QPushButton("⇕")
+        self.layout_toggle_btn.setFont(QFont("Sans", 14))
+        self.layout_toggle_btn.setFixedSize(32, 32)
+        self.layout_toggle_btn.setToolTip("Toggle horizontal/vertical layout")
+        self.layout_toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #e0e0e0;
+                color: #333333;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            QPushButton:hover {
+                background-color: #d0d0d0;
+            }
+        """)
+        self.layout_toggle_btn.clicked.connect(self._toggle_layout)
+        title_layout.addWidget(self.layout_toggle_btn)
+
+        layout.addLayout(title_layout)
 
         # Audio source selection
         source_layout = QHBoxLayout()
@@ -478,6 +510,26 @@ class AstraWindow(QMainWindow):
 
         layout.addLayout(btn_layout)
 
+        # Create splitter for Question/Answer sections
+        self.content_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.content_splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #e0e0e0;
+            }
+            QSplitter::handle:horizontal {
+                width: 6px;
+            }
+            QSplitter::handle:vertical {
+                height: 6px;
+            }
+        """)
+
+        # Question panel (left/top in splitter)
+        self.question_panel = QWidget()
+        question_layout = QVBoxLayout(self.question_panel)
+        question_layout.setContentsMargins(0, 0, 0, 0)
+        question_layout.setSpacing(5)
+
         # Last heard section (for auto-mode)
         last_heard_layout = QHBoxLayout()
         last_heard_label = QLabel("Last heard:")
@@ -491,12 +543,12 @@ class AstraWindow(QMainWindow):
         last_heard_layout.addWidget(self.last_heard_status)
         last_heard_layout.addStretch()
 
-        layout.addLayout(last_heard_layout)
+        question_layout.addLayout(last_heard_layout)
 
         self.last_heard_box = QTextEdit()
         self.last_heard_box.setReadOnly(True)
         self.last_heard_box.setFont(QFont("Sans", 9))
-        self.last_heard_box.setMaximumHeight(50)
+        self.last_heard_box.setMinimumHeight(40)
         self.last_heard_box.setPlaceholderText("(waiting for speech...)")
         self.last_heard_box.setStyleSheet("""
             QTextEdit {
@@ -507,18 +559,18 @@ class AstraWindow(QMainWindow):
                 padding: 4px;
             }
         """)
-        layout.addWidget(self.last_heard_box)
+        question_layout.addWidget(self.last_heard_box)
 
         # Transcription section (manual mode)
         trans_label = QLabel("Question:")
         trans_label.setFont(QFont("Sans", 10))
         trans_label.setStyleSheet("color: #333333;")
-        layout.addWidget(trans_label)
+        question_layout.addWidget(trans_label)
 
         self.transcription_box = QTextEdit()
         self.transcription_box.setReadOnly(True)
         self.transcription_box.setFont(QFont("Sans", 11))
-        self.transcription_box.setMaximumHeight(80)
+        self.transcription_box.setMinimumHeight(60)
         self.transcription_box.setPlaceholderText("(transcription appears here)")
         self.transcription_box.setStyleSheet("""
             QTextEdit {
@@ -529,13 +581,21 @@ class AstraWindow(QMainWindow):
                 padding: 5px;
             }
         """)
-        layout.addWidget(self.transcription_box)
+        self.transcription_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        question_layout.addWidget(self.transcription_box, stretch=1)
 
-        # Answer section
+        self.content_splitter.addWidget(self.question_panel)
+
+        # Answer panel (right/bottom in splitter)
+        self.answer_panel = QWidget()
+        answer_layout = QVBoxLayout(self.answer_panel)
+        answer_layout.setContentsMargins(0, 0, 0, 0)
+        answer_layout.setSpacing(5)
+
         answer_label = QLabel("Answer:")
         answer_label.setFont(QFont("Sans", 10))
         answer_label.setStyleSheet("color: #333333;")
-        layout.addWidget(answer_label)
+        answer_layout.addWidget(answer_label)
 
         self.answer_box = QTextEdit()
         self.answer_box.setReadOnly(True)
@@ -550,7 +610,16 @@ class AstraWindow(QMainWindow):
                 padding: 8px;
             }
         """)
-        layout.addWidget(self.answer_box, stretch=1)
+        self.answer_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        answer_layout.addWidget(self.answer_box, stretch=1)
+
+        self.content_splitter.addWidget(self.answer_panel)
+
+        # Set initial splitter sizes (40% question, 60% answer)
+        self.content_splitter.setSizes([200, 300])
+        self.content_splitter.setChildrenCollapsible(False)
+
+        layout.addWidget(self.content_splitter, stretch=1)
 
         # Status bar
         self.status_label = QLabel("Status: Initializing...")
@@ -1031,6 +1100,28 @@ class AstraWindow(QMainWindow):
             self.queue_label.setText(f"📋 {count} queued")
         else:
             self.queue_label.setText("")
+
+    def _toggle_layout(self):
+        """Toggle between horizontal and vertical layout."""
+        self.horizontal_layout = not self.horizontal_layout
+        self._update_layout_orientation()
+
+    def _update_layout_orientation(self):
+        """Update splitter orientation based on layout mode."""
+        if self.horizontal_layout:
+            self.content_splitter.setOrientation(Qt.Orientation.Horizontal)
+            self.layout_toggle_btn.setText("⇔")
+            self.layout_toggle_btn.setToolTip("Switch to vertical layout")
+            # Adjust sizes for horizontal layout (40% question, 60% answer)
+            total_width = self.content_splitter.width()
+            self.content_splitter.setSizes([int(total_width * 0.4), int(total_width * 0.6)])
+        else:
+            self.content_splitter.setOrientation(Qt.Orientation.Vertical)
+            self.layout_toggle_btn.setText("⇕")
+            self.layout_toggle_btn.setToolTip("Switch to horizontal layout")
+            # Adjust sizes for vertical layout (40% question, 60% answer)
+            total_height = self.content_splitter.height()
+            self.content_splitter.setSizes([int(total_height * 0.4), int(total_height * 0.6)])
 
     def closeEvent(self, event):
         """Clean up on close."""
