@@ -62,6 +62,120 @@ class SignalBridge(QObject):
     queue_update = pyqtSignal(int)            # Number of queued questions
 
 
+class StartupScreen(QWidget):
+    """Startup screen with Ingest Documents and Start Session buttons."""
+
+    # Signals emitted when buttons are clicked
+    ingest_requested = pyqtSignal()
+    start_session_requested = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._init_ui()
+
+    def _init_ui(self):
+        """Set up the startup screen user interface."""
+        self.setWindowTitle("Astra Interview Copilot")
+        self.setFixedSize(400, 350)
+        self.setStyleSheet("background-color: #ffffff;")
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(20)
+        layout.setContentsMargins(40, 40, 40, 40)
+
+        # Title
+        title = QLabel("Astra Interview Copilot")
+        title.setFont(QFont("Sans", 18, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #222222;")
+        layout.addWidget(title)
+
+        # Instructions
+        instructions = QLabel(
+            "Welcome! Choose an option below:\n\n"
+            "• Ingest Documents - Scan the documents/ folder\n"
+            "  to build your knowledge base\n\n"
+            "• Start Session - Begin the interview copilot"
+        )
+        instructions.setFont(QFont("Sans", 10))
+        instructions.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        instructions.setStyleSheet("color: #555555;")
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+
+        layout.addStretch()
+
+        # Ingest Documents button (blue - primary action)
+        self.ingest_btn = QPushButton("Ingest Documents")
+        self.ingest_btn.setFont(QFont("Sans", 12))
+        self.ingest_btn.setMinimumHeight(50)
+        self.ingest_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4a90d9;
+                color: white;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #3a7bc8;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.ingest_btn.clicked.connect(self._on_ingest_clicked)
+        layout.addWidget(self.ingest_btn)
+
+        # Start Session button (green - secondary action)
+        self.start_btn = QPushButton("Start Session")
+        self.start_btn.setFont(QFont("Sans", 12))
+        self.start_btn.setMinimumHeight(50)
+        self.start_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #28a745;
+                color: white;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #218838;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.start_btn.clicked.connect(self._on_start_session_clicked)
+        layout.addWidget(self.start_btn)
+
+        # Status label for ingestion feedback
+        self.status_label = QLabel("")
+        self.status_label.setFont(QFont("Sans", 9))
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setStyleSheet("color: #666666;")
+        layout.addWidget(self.status_label)
+
+    def _on_ingest_clicked(self):
+        """Handle Ingest Documents button click."""
+        self.ingest_requested.emit()
+
+    def _on_start_session_clicked(self):
+        """Handle Start Session button click."""
+        self.start_session_requested.emit()
+
+    def set_status(self, message: str, is_error: bool = False):
+        """Update the status label."""
+        if is_error:
+            self.status_label.setStyleSheet("color: #d9534f;")
+        else:
+            self.status_label.setStyleSheet("color: #666666;")
+        self.status_label.setText(message)
+
+    def set_buttons_enabled(self, enabled: bool):
+        """Enable or disable buttons during operations."""
+        self.ingest_btn.setEnabled(enabled)
+        self.start_btn.setEnabled(enabled)
+
+
 class AstraWindow(QMainWindow):
     def __init__(self):
         super().__init__()
