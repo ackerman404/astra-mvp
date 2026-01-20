@@ -13,6 +13,7 @@ Optimize the audio-to-answer pipeline from ~3-5 seconds down to sub-3-second lat
 - [x] **Phase 1: Memory Audio Pipeline** - Eliminate temp file I/O, keep audio in numpy arrays
 - [x] **Phase 2: Transcription Optimization** - Faster Whisper with tiny.en model and VAD
 - [ ] **Phase 3: Observability & Config** - Timing display and model selection
+- [ ] **Phase 4: Windows Compatibility & Easy Setup** - Making it work on Windows, easy to setup and run
 
 ## Phase Details
 
@@ -59,6 +60,23 @@ Plans:
 Plans:
 - [ ] 03-01: Timing display and model config
 
+### Phase 4: Windows Compatibility & Easy Setup
+**Goal**: Making it work on Windows, easy to setup and run
+**Depends on**: Phase 3
+**Requirements**: PLAT-02 (Windows audio capture)
+**Success Criteria** (what must be TRUE):
+  1. Application runs on Windows without code modification
+  2. Audio capture works on Windows via WASAPI loopback
+  3. Simple setup process (one-click scripts)
+  4. Easy to run (single command or executable)
+**Research**: Complete (PyAudioWPatch for WASAPI, PyInstaller for packaging)
+**Plans**: 3 plans in 3 waves
+
+Plans:
+- [ ] 04-01: Audio abstraction layer + Linux refactor
+- [ ] 04-02: Windows audio backend (WASAPI)
+- [ ] 04-03: Easy setup scripts + packaging
+
 ## Progress
 
 **Execution Order:**
@@ -69,3 +87,4 @@ Phases execute in numeric order: 1 → 2 → 3
 | 1. Memory Audio Pipeline | 1/1 | Complete | 2026-01-17 |
 | 2. Transcription Optimization | 1/1 | Complete | 2026-01-17 |
 | 3. Observability & Config | 0/1 | Not started | - |
+| 4. Windows Compatibility & Easy Setup | 0/3 | Not started | - |
