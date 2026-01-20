@@ -1,90 +1,101 @@
-# Roadmap: Astra Interview Copilot
+# Roadmap: Astra Interview Copilot v2.0
 
 ## Overview
 
-Optimize the audio-to-answer pipeline from ~3-5 seconds down to sub-3-second latency. Three focused phases: eliminate temp file I/O, speed up Whisper inference, then add timing visibility and configurability.
+Improve user experience with GUI-based document ingestion, flexible window layout, and secure API key handling. Four focused phases: startup screen, document ingestion, resizable layout, then secure configuration.
 
 ## Phases
 
 **Phase Numbering:**
-- Integer phases (1, 2, 3): Planned milestone work
+- Integer phases (1, 2, 3, 4): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions (marked with INSERTED)
 
-- [x] **Phase 1: Memory Audio Pipeline** - Eliminate temp file I/O, keep audio in numpy arrays
-- [x] **Phase 2: Transcription Optimization** - Faster Whisper with tiny.en model and VAD
-- [ ] **Phase 3: Observability & Config** - Timing display and model selection
-- [x] **Phase 4: Windows Compatibility & Easy Setup** - Making it work on Windows, easy to setup and run
+- [x] **Phase 1: Startup Screen** - Two-option launcher: "Ingest Documents" or "Start Session"
+- [ ] **Phase 2: GUI Document Ingestion** - Ingest documents from GUI with progress feedback
+- [ ] **Phase 3: Resizable Layout** - Remove fixed size, support horizontal layout
+- [ ] **Phase 4: Secure API Key Handling** - Load API key from user config, not repo
 
 ## Phase Details
 
-### Phase 1: Memory Audio Pipeline
-**Goal**: Eliminate temp file I/O, keep audio in numpy arrays
+### Phase 1: Startup Screen
+**Goal**: Create a startup screen with two clear options for users
 **Depends on**: Nothing (first phase)
-**Requirements**: AUDIO-01, AUDIO-02
+**Requirements**: GUI-01, GUI-02, GUI-03
 **Success Criteria** (what must be TRUE):
-  1. Audio capture stores data directly in numpy array (no temp file written)
-  2. Numpy array passed to faster-whisper without intermediate file
-  3. Existing functionality still works (transcription produces text)
-**Research**: Unlikely (faster-whisper already supports numpy input)
+  1. App launches to startup screen (not directly to session)
+  2. "Ingest Documents" button visible and functional
+  3. "Start Session" button visible and navigates to existing session screen
+  4. Session screen still fully functional after navigation
+**Research**: Unlikely (standard PyQt6 patterns)
 **Plans**: 1 plan
 
 Plans:
-- [x] 01-01: Memory audio pipeline implementation
+- [x] 01-01: Startup screen implementation
 
-### Phase 2: Transcription Optimization
-**Goal**: Faster Whisper inference with tiny.en and VAD
+### Phase 2: GUI Document Ingestion
+**Goal**: Enable document ingestion through the GUI without CLI
 **Depends on**: Phase 1
-**Requirements**: TRANS-01, TRANS-02, TRANS-03
+**Requirements**: INGEST-01, INGEST-02, INGEST-03
 **Success Criteria** (what must be TRUE):
-  1. Default model is tiny.en (not base.en)
-  2. Transcription uses beam_size=1
-  3. VAD filtering skips silence segments
-  4. Transcription latency reduced (measurable improvement)
-**Research**: Unlikely (documented params: beam_size, vad_filter)
+  1. Clicking "Ingest Documents" scans `documents/` folder
+  2. Progress/status shown during ingestion (file count, current file)
+  3. Success/error feedback displayed to user
+  4. User can proceed to session after ingestion completes
+**Research**: Unlikely (reuse existing ingest.py logic)
 **Plans**: 1 plan
 
 Plans:
-- [x] 02-01: Transcription optimization implementation
+- [ ] 02-01: GUI ingestion with progress feedback
 
-### Phase 3: Observability & Config
-**Goal**: Timing visibility and model selection
-**Depends on**: Phase 2
-**Requirements**: OBS-01, CONFIG-01
+### Phase 3: Resizable Layout
+**Goal**: Make window resizable with horizontal layout option
+**Depends on**: Phase 1
+**Requirements**: LAYOUT-01, LAYOUT-02
 **Success Criteria** (what must be TRUE):
-  1. Status bar shows capture/transcription/RAG timing
-  2. User can select Whisper model from config
-  3. Model selection affects transcription behavior
-**Research**: Unlikely (internal UI and config patterns)
-**Plans**: TBD
+  1. Window can be resized by dragging edges/corners
+  2. UI elements scale appropriately when resized
+  3. Horizontal layout works on wider screens (Question left, Answer right)
+  4. Minimum size enforced to prevent unusable layouts
+**Research**: Unlikely (PyQt6 layout managers)
+**Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: Timing display and model config
+- [ ] 03-01: Resizable window with horizontal layout
 
-### Phase 4: Windows Compatibility & Easy Setup
-**Goal**: Making it work on Windows, easy to setup and run
-**Depends on**: Phase 3
-**Requirements**: PLAT-02 (Windows audio capture)
+### Phase 4: Secure API Key Handling
+**Goal**: Move API key storage to user config folder
+**Depends on**: Nothing (can be done in parallel)
+**Requirements**: SEC-01, SEC-02, SEC-03
 **Success Criteria** (what must be TRUE):
-  1. Application runs on Windows without code modification
-  2. Audio capture works on Windows via WASAPI loopback
-  3. Simple setup process (one-click scripts)
-  4. Easy to run (single command or executable)
-**Research**: Complete (PyAudioWPatch for WASAPI, PyInstaller for packaging)
-**Plans**: 3 plans in 3 waves
+  1. API key loaded from user config folder (~/.config/astra/ or %APPDATA%\astra\)
+  2. No .env file with API key in repo (only .env.example)
+  3. First-run prompt if no API key configured
+  4. Clear instructions shown to user for setup
+**Research**: Unlikely (platformdirs library, standard config patterns)
+**Plans**: 1 plan
 
 Plans:
-- [x] 04-01: Audio abstraction layer + Linux refactor
-- [x] 04-02: Windows audio backend (WASAPI)
-- [x] 04-03: Easy setup scripts + packaging
+- [ ] 04-01: Secure API key config implementation
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 → 2 → 3
+Phases execute in order: 1 → 2 → 3 → 4
+Note: Phase 3 and 4 can run in parallel after Phase 1
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Memory Audio Pipeline | 1/1 | Complete | 2026-01-17 |
-| 2. Transcription Optimization | 1/1 | Complete | 2026-01-17 |
-| 3. Observability & Config | 0/1 | Not started | - |
-| 4. Windows Compatibility & Easy Setup | 3/3 | Complete | 2026-01-20 |
+| 1. Startup Screen | 1/1 | Complete | 2026-01-20 |
+| 2. GUI Document Ingestion | 0/1 | Not started | - |
+| 3. Resizable Layout | 0/1 | Not started | - |
+| 4. Secure API Key Handling | 0/1 | Not started | - |
+
+## v1.0 Archive
+
+Previous milestone (v1.0 Latency Optimization & Cross-Platform) completed phases:
+- Phase 1: Memory Audio Pipeline (Complete)
+- Phase 2: Transcription Optimization (Complete)
+- Phase 3: Observability & Config (Deferred)
+- Phase 4: Windows Compatibility & Easy Setup (Complete)
+
+See `.planning/archive/v1.0/` for detailed phase summaries.

@@ -9,12 +9,12 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-01-20 — Milestone v2.0 started
+Phase: 1 of 4 — Startup Screen
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 01-01-PLAN.md
 
-Progress: ░░░░░░░░░░ 0%
+Progress: ██░░░░░░░░ 25%
 
 ## Performance Metrics
 
@@ -48,6 +48,8 @@ Recent decisions affecting current work:
 | 04-01 | Factory function for platform detection | Clean abstraction using sys.platform |
 | 04-02 | PyAudioWPatch for Windows WASAPI | Extends PyAudio with loopback support for system audio capture |
 | 04-02 | Version-pinned dependencies | Address CONCERNS.md item #12 with minimum version constraints |
+| 01-01 | Lazy-create AstraWindow | Save resources by creating session window only when needed |
+| 01-01 | QTimer polling for thread completion | Non-blocking UI during background ingestion |
 
 ### Pending Todos
 
@@ -60,12 +62,12 @@ None yet.
 ### Roadmap Evolution
 
 - v1.0 complete: Phases 1, 2, 4 shipped
-- v2.0 started: GUI improvements & security
+- v2.0 started: 4 phases planned (startup screen, GUI ingestion, layout, security)
 
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Milestone v2.0 initialized
+Stopped at: Completed Phase 1, Plan 01 (Startup Screen)
 Resume file: None
 
 ## Completed Plans
@@ -77,3 +79,4 @@ Resume file: None
 | 04-01 | Windows Compatibility Setup | Audio capture abstraction layer + Linux refactor |
 | 04-02 | Windows Compatibility Setup | Windows audio backend (WASAPI via PyAudioWPatch) |
 | 04-03 | Windows Compatibility Setup | Easy setup scripts + packaging |
+| 01-01 | Startup Screen | StartupScreen widget + AstraApp navigation controller |
