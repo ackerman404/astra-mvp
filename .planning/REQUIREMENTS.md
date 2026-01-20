@@ -31,7 +31,7 @@ Requirements for latency optimization release.
 
 - [ ] **CONFIG-01**: Config option to select Whisper model (tiny.en, base.en, small.en, etc.)
 
-## v2 Requirements (Active)
+## v2 Requirements (Complete)
 
 Requirements for GUI improvements and security.
 
@@ -54,9 +54,9 @@ Requirements for GUI improvements and security.
 
 ### Security
 
-- [ ] **SEC-01**: API key loaded from user config folder (not project .env)
-- [ ] **SEC-02**: No API keys committed to repository
-- [ ] **SEC-03**: Clear user guidance for API key setup on first run
+- [x] **SEC-01**: API key loaded from user config folder (not project .env)
+- [x] **SEC-02**: No API keys committed to repository
+- [x] **SEC-03**: Clear user guidance for API key setup on first run
 
 ## Out of Scope
 
@@ -92,9 +92,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | INGEST-03 | Phase 2 (v2) | Complete |
 | LAYOUT-01 | Phase 3 (v2) | Complete |
 | LAYOUT-02 | Phase 3 (v2) | Complete |
-| SEC-01 | Phase 4 (v2) | Pending |
-| SEC-02 | Phase 4 (v2) | Pending |
-| SEC-03 | Phase 4 (v2) | Pending |
+| SEC-01 | Phase 4 (v2) | Complete |
+| SEC-02 | Phase 4 (v2) | Complete |
+| SEC-03 | Phase 4 (v2) | Complete |
 
 **Coverage:**
 - v2 requirements: 11 total
@@ -103,4 +103,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-20 after Phase 3 completion*
+*Last updated: 2026-01-20 after Phase 4 completion (v2.0 milestone complete)*
