@@ -4,7 +4,52 @@ Astra Interview Copilot - Configuration
 
 Configuration constants and default values.
 Audio device management moved to audio_capture.py.
+API key management with cross-platform user config directory.
 """
+
+from platformdirs import user_config_dir
+from pathlib import Path
+
+
+def get_config_dir() -> Path:
+    """Get cross-platform user config directory for Astra."""
+    config_dir = Path(user_config_dir("astra"))
+    config_dir.mkdir(parents=True, exist_ok=True)
+    return config_dir
+
+
+def get_api_key() -> str | None:
+    """
+    Load OpenAI API key from user config directory.
+
+    Config location:
+    - Linux: ~/.config/astra/.env
+    - Windows: %APPDATA%/astra/.env
+    - macOS: ~/Library/Application Support/astra/.env
+
+    Returns None if not found.
+    """
+    config_file = get_config_dir() / ".env"
+
+    if not config_file.exists():
+        return None
+
+    # Parse simple KEY=value format
+    with open(config_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("OPENAI_API_KEY="):
+                # Handle quoted values
+                value = line.split("=", 1)[1]
+                return value.strip('"').strip("'")
+
+    return None
+
+
+def get_config_path() -> Path:
+    """Get path to config file for display to user."""
+    return get_config_dir() / ".env"
+
 
 # Audio Configuration
 AUDIO_DEVICE = "alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__hw_sofhdadsp__sink.monitor"
