@@ -10,18 +10,18 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 4 of 4 — Secure API Key Handling
-Plan: 01 planned
-Status: Ready for execution
-Last activity: 2026-01-20 — Phase 4 plan created (secure API key config)
+Plan: 1 of 1 in current phase
+Status: Phase complete - Milestone complete
+Last activity: 2026-01-19 — Completed 04-01-PLAN.md
 
-Progress: ███████░░░ 75%
+Progress: ██████████ 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 6
+- Total plans completed: 7
 - Average duration: ~3 min
-- Total execution time: ~17 min
+- Total execution time: ~23 min
 
 **By Phase:**
 
@@ -32,9 +32,11 @@ Progress: ███████░░░ 75%
 | 04-windows-compatibility-setup | 3 | ~6 min | ~2 min |
 | 01-startup-screen | 1 | ~5 min | ~5 min |
 | 02-gui-document-ingestion | 1 | ~5 min | ~5 min |
+| 03-resizable-layout | 1 | ~5 min | ~5 min |
+| 04-secure-api-key-handling | 1 | ~6 min | ~6 min |
 
 **Recent Trend:**
-- Last 5 plans: 04-02, 04-03, 01-01 (startup), 02-01 (ingestion)
+- Last 5 plans: 01-01 (startup), 02-01 (ingestion), 03-01 (layout), 04-01 (security)
 - Trend: Stable
 
 ## Accumulated Context
@@ -56,6 +58,8 @@ Recent decisions affecting current work:
 | 02-01 | Signal-based over polling | IngestionSignals for cleaner thread-safe UI updates |
 | 03-01 | QSplitter for Q/A panels | User-adjustable divider between Question and Answer sections |
 | 03-01 | Layout toggle in title row | Easy access without cluttering main UI area |
+| 04-01 | Use platformdirs for config | Cross-platform user config directory detection |
+| 04-01 | Explicit api_key to OpenAI() | Pass api_key parameter rather than relying on env var |
 
 ### Pending Todos
 
@@ -68,12 +72,12 @@ None yet.
 ### Roadmap Evolution
 
 - v1.0 complete: Phases 1, 2, 4 shipped
-- v2.0 started: 4 phases planned (startup screen, GUI ingestion, layout, security)
+- v2.0 complete: All 4 phases shipped (startup screen, GUI ingestion, layout, security)
 
 ## Session Continuity
 
-Last session: 2026-01-20
-Stopped at: Completed Phase 3, Plan 01 (Resizable Layout)
+Last session: 2026-01-19
+Stopped at: Completed Phase 4, Plan 01 (Secure API Key Handling) - Milestone v2.0 complete
 Resume file: None
 
 ## Completed Plans
@@ -88,3 +92,4 @@ Resume file: None
 | 01-01 | Startup Screen | StartupScreen widget + AstraApp navigation controller |
 | 02-01 | GUI Document Ingestion | Progress bar and status updates during ingestion |
 | 03-01 | Resizable Layout | Resizable windows + QSplitter + horizontal layout toggle |
+| 04-01 | Secure API Key Handling | platformdirs config + first-run setup dialog |
