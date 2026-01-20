@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: 2 of 4 — GUI Document Ingestion (Complete)
-Plan: Complete
-Status: Phase Complete
-Last activity: 2026-01-20 — Phase 2 complete (GUI document ingestion with progress feedback)
+Phase: 3 of 4 — Resizable Layout
+Plan: 01 planned
+Status: Ready for execution
+Last activity: 2026-01-20 — Phase 3 plan created (resizable window + horizontal layout)
 
 Progress: █████░░░░░ 50%
 
