@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 
 ## Current Position
 
-Phase: 1 of 4 — Startup Screen
-Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-01-20 — Completed 01-01-PLAN.md
+Phase: 2 of 4 — GUI Document Ingestion
+Plan: 01
+Status: Complete
+Last activity: 2026-01-20 — Plan 01 executed (ingestion progress feedback)
 
-Progress: ██░░░░░░░░ 25%
+Progress: █████░░░░░ 50%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 4
+- Total plans completed: 6
 - Average duration: ~3 min
-- Total execution time: ~12 min
+- Total execution time: ~17 min
 
 **By Phase:**
 
@@ -30,9 +30,11 @@ Progress: ██░░░░░░░░ 25%
 | 01-memory-audio-pipeline | 1 | ~5 min | ~5 min |
 | 02-transcription-optimization | 1 | ~1 min | ~1 min |
 | 04-windows-compatibility-setup | 3 | ~6 min | ~2 min |
+| 01-startup-screen | 1 | ~5 min | ~5 min |
+| 02-gui-document-ingestion | 1 | ~5 min | ~5 min |
 
 **Recent Trend:**
-- Last 5 plans: 01-01, 02-01, 04-01, 04-02, 04-03
+- Last 5 plans: 04-02, 04-03, 01-01 (startup), 02-01 (ingestion)
 - Trend: Stable
 
 ## Accumulated Context
@@ -50,6 +52,8 @@ Recent decisions affecting current work:
 | 04-02 | Version-pinned dependencies | Address CONCERNS.md item #12 with minimum version constraints |
 | 01-01 | Lazy-create AstraWindow | Save resources by creating session window only when needed |
 | 01-01 | QTimer polling for thread completion | Non-blocking UI during background ingestion |
+| 02-01 | Keep ingest.py pure Python | No Qt imports in ingest.py; callback is plain Python callable |
+| 02-01 | Signal-based over polling | IngestionSignals for cleaner thread-safe UI updates |
 
 ### Pending Todos
 
@@ -67,7 +71,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed Phase 1, Plan 01 (Startup Screen)
+Stopped at: Completed Phase 2, Plan 01 (Ingestion Progress Feedback)
 Resume file: None
 
 ## Completed Plans
@@ -80,3 +84,4 @@ Resume file: None
 | 04-02 | Windows Compatibility Setup | Windows audio backend (WASAPI via PyAudioWPatch) |
 | 04-03 | Windows Compatibility Setup | Easy setup scripts + packaging |
 | 01-01 | Startup Screen | StartupScreen widget + AstraApp navigation controller |
+| 02-01 | GUI Document Ingestion | Progress bar and status updates during ingestion |
