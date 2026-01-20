@@ -10,11 +10,11 @@ See: .planning/PROJECT.md (updated 2026-01-20)
 ## Current Position
 
 Phase: 3 of 4 — Resizable Layout
-Plan: 01 planned
-Status: Ready for execution
-Last activity: 2026-01-20 — Phase 3 plan created (resizable window + horizontal layout)
+Plan: 1 of 1 in current phase
+Status: Phase complete
+Last activity: 2026-01-20 — Completed 03-01-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ███████░░░ 75%
 
 ## Performance Metrics
 
@@ -54,6 +54,8 @@ Recent decisions affecting current work:
 | 01-01 | QTimer polling for thread completion | Non-blocking UI during background ingestion |
 | 02-01 | Keep ingest.py pure Python | No Qt imports in ingest.py; callback is plain Python callable |
 | 02-01 | Signal-based over polling | IngestionSignals for cleaner thread-safe UI updates |
+| 03-01 | QSplitter for Q/A panels | User-adjustable divider between Question and Answer sections |
+| 03-01 | Layout toggle in title row | Easy access without cluttering main UI area |
 
 ### Pending Todos
 
@@ -71,7 +73,7 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-20
-Stopped at: Completed Phase 2, Plan 01 (Ingestion Progress Feedback)
+Stopped at: Completed Phase 3, Plan 01 (Resizable Layout)
 Resume file: None
 
 ## Completed Plans
@@ -85,3 +87,4 @@ Resume file: None
 | 04-03 | Windows Compatibility Setup | Easy setup scripts + packaging |
 | 01-01 | Startup Screen | StartupScreen widget + AstraApp navigation controller |
 | 02-01 | GUI Document Ingestion | Progress bar and status updates during ingestion |
+| 03-01 | Resizable Layout | Resizable windows + QSplitter + horizontal layout toggle |

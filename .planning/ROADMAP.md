@@ -12,7 +12,7 @@ Improve user experience with GUI-based document ingestion, flexible window layou
 
 - [x] **Phase 1: Startup Screen** - Two-option launcher: "Ingest Documents" or "Start Session"
 - [x] **Phase 2: GUI Document Ingestion** - Ingest documents from GUI with progress feedback
-- [ ] **Phase 3: Resizable Layout** - Remove fixed size, support horizontal layout
+- [x] **Phase 3: Resizable Layout** - Remove fixed size, support horizontal layout
 - [ ] **Phase 4: Secure API Key Handling** - Load API key from user config, not repo
 
 ## Phase Details
@@ -60,7 +60,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 03-01: Resizable window with horizontal layout
+- [x] 03-01: Resizable window with horizontal layout
 
 ### Phase 4: Secure API Key Handling
 **Goal**: Move API key storage to user config folder
@@ -87,7 +87,7 @@ Note: Phase 3 and 4 can run in parallel after Phase 1
 |-------|----------------|--------|-----------|
 | 1. Startup Screen | 1/1 | Complete | 2026-01-20 |
 | 2. GUI Document Ingestion | 1/1 | Complete | 2026-01-20 |
-| 3. Resizable Layout | 0/1 | Not started | - |
+| 3. Resizable Layout | 1/1 | Complete | 2026-01-20 |
 | 4. Secure API Key Handling | 0/1 | Not started | - |
 
 ## v1.0 Archive
