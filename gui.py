@@ -39,6 +39,8 @@ from config import (
     CLASSIFICATION_CONFIDENCE,
     MIN_WORDS_FOR_CLASSIFICATION,
     AUDIO_SAMPLE_RATE,
+    get_api_key,
+    get_config_path,
 )
 
 
@@ -1144,6 +1146,44 @@ class AstraApp:
         # Thread for background ingestion
         self._ingest_thread = None
 
+        # Check API key on startup
+        if not get_api_key():
+            self._show_api_key_setup()
+
+    def _show_api_key_setup(self):
+        """Show first-run API key setup dialog."""
+        config_path = get_config_path()
+
+        msg = QMessageBox()
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setWindowTitle("API Key Setup Required")
+        msg.setText("OpenAI API key not found.")
+        msg.setInformativeText(
+            f"Please create a config file at:\n\n"
+            f"{config_path}\n\n"
+            f"With content:\n"
+            f"OPENAI_API_KEY=sk-your-key-here\n\n"
+            f"Get your API key from:\n"
+            f"https://platform.openai.com/api-keys"
+        )
+        msg.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
+        msg.setDefaultButton(QMessageBox.StandardButton.Ok)
+
+        result = msg.exec()
+
+        if result == QMessageBox.StandardButton.Cancel:
+            sys.exit(0)
+
+        # Re-check after user clicks OK
+        if not get_api_key():
+            QMessageBox.warning(
+                None,
+                "API Key Still Missing",
+                f"API key not found at {config_path}\n\n"
+                "Please create the file and restart the application."
+            )
+            sys.exit(1)
+
     def show(self):
         """Show the startup screen."""
         self.startup_screen.show()
@@ -1245,6 +1285,15 @@ class AstraApp:
 
     def _on_start_session(self):
         """Handle start session request."""
+        # Safety check for API key
+        if not get_api_key():
+            QMessageBox.warning(
+                self.startup_screen,
+                "API Key Missing",
+                f"Please configure your API key at:\n{get_config_path()}"
+            )
+            return
+
         # Create session window if not exists
         if self.session_window is None:
             self.session_window = AstraWindow()
