@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QSlider,
     QFrame,
+    QMessageBox,
 )
 from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
 from PyQt6.QtGui import QFont, QTextCursor
@@ -996,6 +997,100 @@ class AstraWindow(QMainWindow):
         if self.is_listening:
             self._stop_listening()
         event.accept()
+
+
+class AstraApp:
+    """Application controller managing screen transitions."""
+
+    def __init__(self):
+        self.startup_screen = StartupScreen()
+        self.session_window = None  # Lazy create
+
+        # Connect startup screen signals
+        self.startup_screen.ingest_requested.connect(self._on_ingest)
+        self.startup_screen.start_session_requested.connect(self._on_start_session)
+
+        # Thread for background ingestion
+        self._ingest_thread = None
+
+    def show(self):
+        """Show the startup screen."""
+        self.startup_screen.show()
+
+    def _on_ingest(self):
+        """Handle document ingestion request."""
+        from ingest import ingest_folder
+        import os
+
+        documents_path = "./documents/"
+
+        # Check if documents folder exists
+        if not os.path.exists(documents_path):
+            self.startup_screen.set_status(
+                f"Error: {documents_path} folder not found",
+                is_error=True
+            )
+            return
+
+        # Disable buttons during ingestion
+        self.startup_screen.set_buttons_enabled(False)
+        self.startup_screen.set_status("Ingesting documents...")
+
+        # Run ingestion in background thread
+        self._ingest_thread = threading.Thread(
+            target=self._run_ingestion,
+            args=(documents_path,),
+            daemon=True
+        )
+        self._ingest_thread.start()
+
+        # Poll for completion using a timer
+        self._check_ingestion_complete()
+
+    def _run_ingestion(self, folder_path: str):
+        """Background thread: run document ingestion."""
+        from ingest import ingest_folder
+
+        try:
+            ingest_folder(folder_path)
+            self._ingestion_result = ("success", "Documents ingested successfully!")
+        except Exception as e:
+            self._ingestion_result = ("error", f"Ingestion failed: {e}")
+
+    def _check_ingestion_complete(self):
+        """Check if ingestion thread has completed."""
+        if self._ingest_thread and self._ingest_thread.is_alive():
+            # Check again in 100ms
+            QTimer.singleShot(100, self._check_ingestion_complete)
+        else:
+            # Ingestion complete
+            self.startup_screen.set_buttons_enabled(True)
+            if hasattr(self, '_ingestion_result'):
+                status, message = self._ingestion_result
+                self.startup_screen.set_status(message, is_error=(status == "error"))
+                if status == "success":
+                    QMessageBox.information(
+                        self.startup_screen,
+                        "Ingestion Complete",
+                        message
+                    )
+                else:
+                    QMessageBox.warning(
+                        self.startup_screen,
+                        "Ingestion Error",
+                        message
+                    )
+                del self._ingestion_result
+
+    def _on_start_session(self):
+        """Handle start session request."""
+        # Create session window if not exists
+        if self.session_window is None:
+            self.session_window = AstraWindow()
+
+        # Hide startup, show session
+        self.startup_screen.hide()
+        self.session_window.show()
 
 
 TEST_UTTERANCES = [
