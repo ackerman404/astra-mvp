@@ -2,8 +2,9 @@
 """
 Audio Capture Abstraction Layer for Astra MVP.
 
-Platform-agnostic audio capture interface with Linux (PulseAudio) implementation.
-Windows implementation to be added in Plan 04-02.
+Platform-agnostic audio capture interface with implementations for:
+- Linux (PulseAudio/PipeWire via parec)
+- Windows (WASAPI loopback via PyAudioWPatch)
 """
 
 import subprocess
@@ -14,6 +15,13 @@ from collections import deque
 from dataclasses import dataclass
 
 import numpy as np
+
+# Conditional import for Windows audio
+if sys.platform == "win32":
+    try:
+        import pyaudiowpatch as pyaudio
+    except ImportError:
+        pyaudio = None
 
 
 # Buffer configuration
@@ -328,6 +336,315 @@ class LinuxAudioCapture(AudioCapture):
             self.stop_capture()
 
 
+class WindowsAudioCapture(AudioCapture):
+    """
+    Windows audio capture implementation using PyAudioWPatch WASAPI loopback.
+
+    PyAudioWPatch extends PyAudio with WASAPI loopback support for capturing
+    system audio on Windows.
+    """
+
+    def __init__(self, device: str = None, sample_rate: int = 16000, channels: int = 1):
+        """
+        Initialize Windows audio capture.
+
+        Args:
+            device: WASAPI device name. If None, auto-detects default loopback.
+            sample_rate: Target sample rate (default 16000 for Whisper)
+            channels: Target channels (default 1 for mono)
+        """
+        if sys.platform != "win32":
+            raise RuntimeError("WindowsAudioCapture only works on Windows")
+
+        if pyaudio is None:
+            raise ImportError(
+                "PyAudioWPatch is required for Windows audio capture. "
+                "Install with: pip install PyAudioWPatch"
+            )
+
+        self._target_sample_rate = sample_rate
+        self._target_channels = channels
+        self._stream = None
+        self._buffer_size = sample_rate * MAX_BUFFER_SECONDS * BYTES_PER_SAMPLE
+        self._buffer = deque(maxlen=self._buffer_size)
+        self._lock = threading.Lock()
+        self._capturing = False
+        self._pa = None
+
+        # Will be set when we find the loopback device
+        self._device = None
+        self._device_info = None
+        self._actual_sample_rate = None
+        self._actual_channels = None
+
+        # Initialize PyAudio and find device
+        self._init_audio(device)
+
+    def _init_audio(self, device_name: str = None):
+        """Initialize PyAudio and find loopback device."""
+        self._pa = pyaudio.PyAudio()
+
+        if device_name:
+            # Find specific device
+            self._device_info = self._find_device_by_name(device_name)
+        else:
+            # Auto-detect default loopback
+            self._device_info = self._find_default_loopback()
+
+        if self._device_info is None:
+            raise RuntimeError(
+                "No WASAPI loopback device found. "
+                "Make sure you have audio output devices available."
+            )
+
+        self._device = self._device_info.get("name", "Unknown")
+        self._actual_sample_rate = int(self._device_info.get("defaultSampleRate", 44100))
+        self._actual_channels = int(self._device_info.get("maxInputChannels", 2))
+
+    def _find_default_loopback(self) -> dict | None:
+        """
+        Find the default WASAPI loopback device.
+
+        PyAudioWPatch provides loopback devices for capturing speaker output.
+        """
+        try:
+            # Get the default WASAPI output device
+            wasapi_info = self._pa.get_host_api_info_by_type(pyaudio.paWASAPI)
+            default_output_idx = wasapi_info.get("defaultOutputDevice")
+
+            if default_output_idx < 0:
+                return None
+
+            default_output = self._pa.get_device_info_by_index(default_output_idx)
+
+            # Find the loopback device for this output
+            # PyAudioWPatch adds loopback devices that mirror output devices
+            for i in range(self._pa.get_device_count()):
+                device_info = self._pa.get_device_info_by_index(i)
+
+                # Loopback devices have isLoopbackDevice flag
+                if device_info.get("isLoopbackDevice", False):
+                    # Check if it's for our default output
+                    # The name often contains the output device name
+                    if default_output["name"] in device_info.get("name", ""):
+                        return device_info
+
+            # If no matching loopback found, try to get any loopback device
+            for i in range(self._pa.get_device_count()):
+                device_info = self._pa.get_device_info_by_index(i)
+                if device_info.get("isLoopbackDevice", False):
+                    return device_info
+
+            return None
+
+        except Exception as e:
+            print(f"Error finding default loopback: {e}")
+            return None
+
+    def _find_device_by_name(self, name: str) -> dict | None:
+        """Find a device by name."""
+        for i in range(self._pa.get_device_count()):
+            device_info = self._pa.get_device_info_by_index(i)
+            if name in device_info.get("name", ""):
+                return device_info
+        return None
+
+    @property
+    def device(self) -> str:
+        """Get current device name."""
+        return self._device or ""
+
+    def list_devices(self) -> list[dict]:
+        """
+        List all available WASAPI loopback devices.
+
+        Returns:
+            List of dicts with 'name' and 'status' keys
+        """
+        devices = []
+
+        if self._pa is None:
+            return devices
+
+        for i in range(self._pa.get_device_count()):
+            try:
+                device_info = self._pa.get_device_info_by_index(i)
+
+                # Only show loopback devices
+                if device_info.get("isLoopbackDevice", False):
+                    devices.append({
+                        "name": device_info.get("name", f"Device {i}"),
+                        "status": "AVAILABLE"
+                    })
+            except Exception:
+                continue
+
+        return devices
+
+    def _audio_callback(self, in_data, frame_count, time_info, status):
+        """Callback for audio stream - receives audio data."""
+        if self._capturing and in_data:
+            # Convert to target format if needed
+            audio_data = self._convert_audio(in_data)
+            with self._lock:
+                self._buffer.extend(audio_data)
+
+        return (None, pyaudio.paContinue)
+
+    def _convert_audio(self, data: bytes) -> bytes:
+        """
+        Convert audio from device format to target format.
+
+        Handles sample rate and channel conversion for Whisper compatibility.
+        """
+        # Parse as float32 (WASAPI typically uses float32)
+        try:
+            samples = np.frombuffer(data, dtype=np.float32)
+        except ValueError:
+            # Try int16 if float32 fails
+            samples = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+
+        # Reshape for channels
+        if self._actual_channels > 1:
+            samples = samples.reshape(-1, self._actual_channels)
+            # Convert to mono by averaging channels
+            samples = samples.mean(axis=1)
+
+        # Resample if needed
+        if self._actual_sample_rate != self._target_sample_rate:
+            # Simple resampling using linear interpolation
+            ratio = self._target_sample_rate / self._actual_sample_rate
+            new_length = int(len(samples) * ratio)
+            if new_length > 0:
+                x_old = np.linspace(0, 1, len(samples))
+                x_new = np.linspace(0, 1, new_length)
+                samples = np.interp(x_new, x_old, samples)
+
+        # Convert to int16 for Whisper
+        samples = np.clip(samples * 32768, -32768, 32767).astype(np.int16)
+
+        return samples.tobytes()
+
+    def start_capture(self) -> None:
+        """Start capturing system audio via WASAPI loopback."""
+        if self._capturing:
+            return
+
+        if self._device_info is None:
+            raise RuntimeError("No audio device configured")
+
+        # Clear buffer
+        with self._lock:
+            self._buffer.clear()
+
+        # Open stream with callback
+        try:
+            self._stream = self._pa.open(
+                format=pyaudio.paFloat32,
+                channels=self._actual_channels,
+                rate=self._actual_sample_rate,
+                input=True,
+                input_device_index=self._device_info["index"],
+                frames_per_buffer=1024,
+                stream_callback=self._audio_callback
+            )
+            self._capturing = True
+            self._stream.start_stream()
+        except Exception as e:
+            raise RuntimeError(f"Failed to start audio capture: {e}")
+
+    def stop_capture(self) -> np.ndarray:
+        """
+        Stop capturing and return audio buffer.
+
+        Returns:
+            numpy array of 16-bit audio samples
+        """
+        self._capturing = False
+
+        # Stop stream
+        if self._stream:
+            try:
+                self._stream.stop_stream()
+                self._stream.close()
+            except Exception:
+                pass
+            self._stream = None
+
+        # Get buffer as numpy array
+        with self._lock:
+            audio_bytes = bytes(self._buffer)
+
+        if not audio_bytes:
+            return np.array([], dtype=np.int16)
+
+        return np.frombuffer(audio_bytes, dtype=np.int16)
+
+    def get_last_n_seconds(self, n: int) -> np.ndarray:
+        """
+        Get last N seconds of audio without stopping capture.
+
+        Args:
+            n: Number of seconds to retrieve
+
+        Returns:
+            numpy array of 16-bit audio samples
+        """
+        bytes_needed = self._target_sample_rate * n * BYTES_PER_SAMPLE
+
+        with self._lock:
+            buffer_list = list(self._buffer)
+
+        # Get last N seconds
+        if len(buffer_list) > bytes_needed:
+            audio_bytes = bytes(buffer_list[-bytes_needed:])
+        else:
+            audio_bytes = bytes(buffer_list)
+
+        if not audio_bytes:
+            return np.array([], dtype=np.int16)
+
+        return np.frombuffer(audio_bytes, dtype=np.int16)
+
+    def get_audio_level(self) -> float:
+        """
+        Get current audio level (RMS) for UI meter.
+
+        Returns:
+            Float from 0.0 to 1.0
+        """
+        # Get last 0.1 seconds
+        bytes_needed = int(self._target_sample_rate * 0.1 * BYTES_PER_SAMPLE)
+
+        with self._lock:
+            buffer_list = list(self._buffer)
+
+        if len(buffer_list) < bytes_needed:
+            return 0.0
+
+        audio_bytes = bytes(buffer_list[-bytes_needed:])
+        samples = np.frombuffer(audio_bytes, dtype=np.int16)
+
+        if len(samples) == 0:
+            return 0.0
+
+        # Calculate RMS and normalize to 0-1 range
+        rms = np.sqrt(np.mean(samples.astype(np.float32) ** 2))
+        normalized = min(1.0, rms / 32768.0 * 4)  # Scale for visibility
+
+        return normalized
+
+    def __del__(self):
+        """Cleanup."""
+        if self._capturing:
+            self.stop_capture()
+        if self._pa:
+            try:
+                self._pa.terminate()
+            except Exception:
+                pass
+
+
 # Module-level functions for device listing (platform-specific)
 
 def list_audio_sources() -> list[AudioSource]:
@@ -466,11 +783,16 @@ def get_audio_capture(device: str = None) -> AudioCapture:
             return LinuxAudioCapture(device=device)
 
     elif sys.platform == "win32":
-        # Windows support will be added in Plan 04-02
-        raise NotImplementedError(
-            "Windows audio capture not yet implemented. "
-            "See Plan 04-02 for WASAPI implementation."
-        )
+        # Windows implementation using PyAudioWPatch WASAPI loopback
+        try:
+            from config import AUDIO_SAMPLE_RATE, AUDIO_CHANNELS
+            return WindowsAudioCapture(
+                device=device,
+                sample_rate=AUDIO_SAMPLE_RATE,
+                channels=AUDIO_CHANNELS
+            )
+        except ImportError:
+            return WindowsAudioCapture(device=device)
 
     elif sys.platform == "darwin":
         raise NotImplementedError(
