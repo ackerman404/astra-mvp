@@ -3,7 +3,7 @@
 **Defined:** 2026-01-17
 **Core Value:** Sub-3-second total response time from silence detection to answer display
 
-## v1 Requirements
+## v1 Requirements (Complete)
 
 Requirements for latency optimization release.
 
@@ -18,32 +18,45 @@ Requirements for latency optimization release.
 - [x] **TRANS-02**: Transcription uses beam_size=1 for faster inference
 - [x] **TRANS-03**: VAD filtering enabled (vad_filter=True) to skip silence segments
 
-### Observability
+### Cross-Platform (v1.0)
+
+- [x] **PLAT-02**: Support for Windows audio capture (WASAPI loopback)
+- [x] **PLAT-03**: Device-agnostic audio abstraction layer
+
+### Observability (Deferred)
 
 - [ ] **OBS-01**: Status bar displays pipeline timing (capture, transcription, RAG duration)
 
-### Configuration
+### Configuration (Deferred)
 
 - [ ] **CONFIG-01**: Config option to select Whisper model (tiny.en, base.en, small.en, etc.)
 
-## v2 Requirements
+## v2 Requirements (Active)
 
-Deferred to future release.
+Requirements for GUI improvements and security.
 
-### Cross-Platform
+### Startup Screen
 
-- **PLAT-01**: Support for macOS audio capture
-- **PLAT-02**: Support for Windows audio capture
-- **PLAT-03**: Device-agnostic audio abstraction layer
+- [x] **GUI-01**: Startup screen displayed when app launches
+- [x] **GUI-02**: "Ingest Documents" button on startup screen triggers document ingestion
+- [x] **GUI-03**: "Start Session" button on startup screen navigates to main session screen
 
-### Performance
+### Document Ingestion
 
-- **PERF-01**: GPU acceleration for Whisper (CUDA support)
-- **PERF-02**: Batch transcription for long audio segments
+- [ ] **INGEST-01**: GUI-based document ingestion (no CLI required)
+- [ ] **INGEST-02**: Ingestion scans `documents/` folder in project directory
+- [ ] **INGEST-03**: Progress/status feedback during ingestion process
 
-### Localization
+### Window Layout
 
-- **LOC-01**: Support for non-English interview transcription
+- [ ] **LAYOUT-01**: Window is resizable (remove fixed size constraint)
+- [ ] **LAYOUT-02**: Support horizontal layout option for wider screens
+
+### Security
+
+- [ ] **SEC-01**: API key loaded from user config folder (not project .env)
+- [ ] **SEC-02**: No API keys committed to repository
+- [ ] **SEC-03**: Clear user guidance for API key setup on first run
 
 ## Out of Scope
 
@@ -51,7 +64,7 @@ Explicitly excluded from current work.
 
 | Feature | Reason |
 |---------|--------|
-| Cross-platform support | Linux optimization first, future work |
+| macOS support | Linux/Windows first, macOS later |
 | GPU acceleration | CPU-only keeps setup simple |
 | Multiple languages | English interviews only for now |
 | Real-time streaming transcription | Silence-triggered batches sufficient |
@@ -62,19 +75,32 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUDIO-01 | Phase 1 | Complete |
-| AUDIO-02 | Phase 1 | Complete |
-| TRANS-01 | Phase 2 | Complete |
-| TRANS-02 | Phase 2 | Complete |
-| TRANS-03 | Phase 2 | Complete |
-| OBS-01 | Phase 3 | Pending |
-| CONFIG-01 | Phase 3 | Pending |
+| AUDIO-01 | Phase 1 (v1) | Complete |
+| AUDIO-02 | Phase 1 (v1) | Complete |
+| TRANS-01 | Phase 2 (v1) | Complete |
+| TRANS-02 | Phase 2 (v1) | Complete |
+| TRANS-03 | Phase 2 (v1) | Complete |
+| PLAT-02 | Phase 4 (v1) | Complete |
+| PLAT-03 | Phase 4 (v1) | Complete |
+| OBS-01 | - | Deferred |
+| CONFIG-01 | - | Deferred |
+| GUI-01 | Phase 1 (v2) | Complete |
+| GUI-02 | Phase 1 (v2) | Complete |
+| GUI-03 | Phase 1 (v2) | Complete |
+| INGEST-01 | Phase 2 (v2) | Pending |
+| INGEST-02 | Phase 2 (v2) | Pending |
+| INGEST-03 | Phase 2 (v2) | Pending |
+| LAYOUT-01 | Phase 3 (v2) | Pending |
+| LAYOUT-02 | Phase 3 (v2) | Pending |
+| SEC-01 | Phase 4 (v2) | Pending |
+| SEC-02 | Phase 4 (v2) | Pending |
+| SEC-03 | Phase 4 (v2) | Pending |
 
 **Coverage:**
-- v1 requirements: 7 total
-- Mapped to phases: 7
+- v2 requirements: 11 total
+- Mapped to phases: 11
 - Unmapped: 0 ✓
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-17 after Phase 2 completion*
+*Last updated: 2026-01-20 after Phase 1 completion*
