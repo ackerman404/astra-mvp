@@ -3,18 +3,19 @@
 Document ingestion script for Astra MVP.
 Reads documents from a folder, chunks them, embeds with OpenAI, and stores in ChromaDB.
 """
+from __future__ import annotations
 
 import argparse
 import os
 import sys
 from pathlib import Path
+from collections.abc import Callable
 
 import chromadb
 import pdfplumber
 from openai import OpenAI
-from dotenv import load_dotenv
 
-load_dotenv()
+from config import get_api_key
 
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
@@ -157,7 +158,7 @@ def get_doc_type(file_path: Path) -> str:
 
 def ingest_folder_with_progress(
     folder_path: str,
-    progress_callback: callable | None = None
+    progress_callback: Callable[[dict], None] | None = None
 ) -> dict:
     """
     Ingest all supported documents from a folder into ChromaDB with progress reporting.
@@ -219,7 +220,13 @@ def ingest_folder_with_progress(
         print(f"Found {total_files} file(s) to process.")
 
     # Initialize OpenAI client
-    openai_client = OpenAI()
+    api_key = get_api_key()
+    if not api_key:
+        msg = "OpenAI API key not configured. See ~/.config/astra/.env"
+        report("error", message=msg, total_files=total_files, current_file_index=0,
+               current_file_name="", current_file_chunks=0, total_chunks=0)
+        return {"success": False, "total_files": total_files, "total_chunks": 0, "errors": [msg]}
+    openai_client = OpenAI(api_key=api_key)
 
     # Initialize ChromaDB
     chroma_client = chromadb.PersistentClient(path="./chroma_db")
