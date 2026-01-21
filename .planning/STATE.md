@@ -9,10 +9,10 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: 5 of 7 (Dual-Pane Layout)
-Plan: 01 complete
-Status: Ready for Phase 6
-Last activity: 2026-01-21 — Phase 5 dual-pane layout complete
+Phase: 6 of 7 (Answer Formats)
+Plan: 01 planned
+Status: Ready for execution
+Last activity: 2026-01-21 — Phase 6 plan created
 
 Progress: ██░░░░░░░░ 33% (Phase 5 complete, Phase 6-7 remaining)
 
