@@ -8,15 +8,16 @@ A desktop application that captures system audio during interviews, transcribes 
 
 Sub-3-second total response time from silence detection to answer display. Speed is the difference between useful real-time assistance and a distraction.
 
-## Current Milestone: v2.0 GUI & Security
+## Current Milestone: v2.1 Dual-Pane Answers
 
-**Goal:** Improve user experience with GUI-based document ingestion, flexible layout, and secure API key handling.
+**Goal:** Display two answer formats simultaneously — quick bullet points and conversational script — with parallel LLM generation to maintain sub-3-second latency.
 
 **Target features:**
-- Startup screen with "Ingest Documents" and "Start Session" options
-- Document ingestion from GUI (scans documents/ folder)
-- Resizable window with horizontal layout support
-- Secure API key handling (not exposed in repo)
+- Dual-pane vertical split layout (bullets left, script right)
+- Question display at top of answer area
+- Quick 2-3 bullet point summary for rapid reference
+- Humanized conversational script with configurable tone
+- Parallel LLM calls for both outputs without latency hit
 
 ## Requirements
 
@@ -42,10 +43,11 @@ Sub-3-second total response time from silence detection to answer display. Speed
 
 <!-- Current scope. Building toward these. -->
 
-- [ ] Startup screen with two options: "Ingest Documents" / "Start Session"
-- [ ] GUI-based document ingestion (scans documents/ folder)
-- [ ] Resizable window with horizontal layout support
-- [ ] Secure API key handling (load from user config, not in repo)
+- [ ] Dual-pane vertical split layout (bullet points + conversational script)
+- [ ] Question display at top of answer area
+- [ ] Parallel LLM generation (two agents, no latency hit)
+- [ ] Quick bullet point format (2-3 key points)
+- [ ] Conversational script format (humanized, tone-configurable)
 
 ### Out of Scope
 
@@ -69,10 +71,16 @@ Sub-3-second total response time from silence detection to answer display. Speed
 - Linux: PulseAudio/PipeWire via parec
 - Windows: WASAPI loopback via PyAudioWPatch
 
+**v2.0 Shipped:**
+- Startup screen with Ingest/Start options
+- GUI-based document ingestion with progress
+- Resizable window with horizontal layout
+- Secure API key handling (platformdirs)
+
 **Current Issues:**
-- Document ingestion only via CLI (--ingest flag)
-- Fixed window size, no horizontal layout
-- API key in .env file (should be in user config folder)
+- Single answer format (STAR only)
+- Sequential LLM calls (one output at a time)
+- No question display in answer area
 
 ## Constraints
 
@@ -93,4 +101,4 @@ Sub-3-second total response time from silence detection to answer display. Speed
 | Factory pattern for platform detection | sys.platform based selection | ✓ Good |
 
 ---
-*Last updated: 2026-01-20 after v2.0 milestone start*
+*Last updated: 2026-01-21 after v2.1 milestone start*

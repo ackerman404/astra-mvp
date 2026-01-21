@@ -31,6 +31,31 @@ Requirements for latency optimization release.
 
 - [ ] **CONFIG-01**: Config option to select Whisper model (tiny.en, base.en, small.en, etc.)
 
+## v2.1 Requirements (Active)
+
+Requirements for dual-pane answer display with parallel generation.
+
+### Dual-Pane Layout
+
+- [ ] **DUAL-01**: Vertical split layout with two answer panes side by side
+- [ ] **DUAL-02**: Question displayed at top of answer area (visible in both contexts)
+- [ ] **DUAL-03**: Left pane displays bullet point summary
+- [ ] **DUAL-04**: Right pane displays conversational script
+
+### Answer Formats
+
+- [ ] **FMT-01**: Bullet point format produces 2-3 key points maximum
+- [ ] **FMT-02**: Conversational script is humanized and readable aloud
+- [ ] **FMT-03**: Script tone is configurable (professional, casual, confident)
+
+### Parallel Generation
+
+- [ ] **PAR-01**: Both answer formats generated via parallel LLM calls
+- [ ] **PAR-02**: Total latency remains under 3 seconds (no sequential hit)
+- [ ] **PAR-03**: Both panes update when their respective response arrives
+
+---
+
 ## v2 Requirements (Complete)
 
 Requirements for GUI improvements and security.
@@ -96,11 +121,33 @@ Which phases cover which requirements. Updated by create-roadmap.
 | SEC-02 | Phase 4 (v2) | Complete |
 | SEC-03 | Phase 4 (v2) | Complete |
 
-**Coverage:**
+**v2 Coverage:**
 - v2 requirements: 11 total
 - Mapped to phases: 11
 - Unmapped: 0 ✓
 
 ---
+
+## v2.1 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| DUAL-01 | Phase 5 | Pending |
+| DUAL-02 | Phase 5 | Pending |
+| DUAL-03 | Phase 5 | Pending |
+| DUAL-04 | Phase 5 | Pending |
+| FMT-01 | Phase 6 | Pending |
+| FMT-02 | Phase 6 | Pending |
+| FMT-03 | Phase 6 | Pending |
+| PAR-01 | Phase 7 | Pending |
+| PAR-02 | Phase 7 | Pending |
+| PAR-03 | Phase 7 | Pending |
+
+**v2.1 Coverage:**
+- v2.1 requirements: 10 total
+- Mapped to phases: 10
+- Unmapped: 0 ✓
+
+---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-20 after Phase 4 completion (v2.0 milestone complete)*
+*Last updated: 2026-01-21 after v2.1 milestone start*
