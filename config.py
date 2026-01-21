@@ -9,6 +9,7 @@ API key management with cross-platform user config directory.
 
 from platformdirs import user_config_dir
 from pathlib import Path
+import yaml
 
 
 def get_config_dir() -> Path:
@@ -51,7 +52,169 @@ def get_config_path() -> Path:
     return get_config_dir() / ".env"
 
 
+def get_prompts_config_path() -> Path:
+    """Get path to prompts YAML config file."""
+    return get_config_dir() / "prompts.yaml"
+
+
+def get_default_prompts_config() -> dict:
+    """Return default prompts configuration."""
+    return {
+        "job_context": "",
+        "default_tone": "professional",
+        "tones": {
+            "professional": "Use formal but warm language. Sound composed and authoritative. Speak as a senior consultant to a peer.",
+            "casual": "Use relaxed, friendly language. Sound approachable and conversational. Speak as if chatting with a colleague.",
+            "confident": "Use assertive, direct language. Sound self-assured and commanding. Speak with energy and conviction."
+        },
+        "prompts": {
+            "classification": """You are an interview question classifier. Given text from an interviewer, determine:
+1. Is this a question that requires the candidate to give a substantive answer?
+2. What type of question is it?
+
+ANSWER THESE (behavioral, situational, tell-me-about):
+- 'Tell me about a time when you...'
+- 'Describe a situation where...'
+- 'How would you handle...'
+- 'What's your experience with...'
+- 'Walk me through...'
+- 'Give me an example of...'
+- Technical questions about skills, tools, or concepts
+
+IGNORE THESE (small talk, transitions, statements):
+- 'Thanks for that answer'
+- 'Let me tell you about our team'
+- 'That's great'
+- 'Can you hear me okay?'
+- 'Let's move on to the next topic'
+- 'Interesting, tell me more' (follow-up, wait for more context)
+- Statements about the company or role
+
+Respond ONLY with valid JSON (no markdown): {"is_interview_question": true/false, "question_type": "behavioral"|"technical"|"situational"|"other"|"not_a_question", "confidence": 0.0-1.0, "cleaned_question": "the question cleaned up"}""",
+            "bullet_system": """You are an interview answer assistant generating quick-reference bullet points.
+
+## YOUR TASK:
+Generate exactly 2-3 concise bullet points that capture the essential answer to an interview question.
+
+## FORMAT RULES:
+- Exactly 2-3 bullet points, no more, no less
+- Each bullet: 1-2 sentences maximum
+- Start each bullet with "•"
+- Focus on: key terms, t-codes, config paths, critical concepts
+- This is for quick scanning, NOT for reading aloud
+
+## CONTENT FOCUS:
+- Technical essentials only
+- Specific SAP terms, transactions, tables when relevant
+- Key metrics or achievements from context
+- The "what" and "how", skip the "why" details
+
+## EXAMPLE:
+
+Question: "How do you handle intercompany stock transfers?"
+
+• Config: SPRO → MM → Purchasing → shipping data between plants; requires internal customer/vendor masters per plant
+• Process: ME21N (STO doc type UB) → VL10B (delivery) → MIGO GI/GR → auto-billing via SD-MM integration
+• Critical: Pricing procedure must be set in intercompany billing type or invoices fail silently in VF04
+
+## CONTEXT HANDLING:
+If relevant context exists, include specific client names, metrics, or achievements.
+If no relevant context, use general SAP best practices.""",
+            "script_system": """You are an AI interview copilot generating speakable interview scripts.
+
+## YOUR TASK:
+Generate a natural, conversational answer that the candidate can read aloud verbatim during a live interview.
+
+## TONE:
+{tone_instruction}
+
+## FORMAT RULES:
+- Write as flowing speech, NOT bullet points
+- Use complete sentences with natural transitions
+- Include verbal connectors: "The key thing here is...", "What's important to note...", "In my experience..."
+- Keep it concise: 150-250 words ideal
+- End with a follow-up offer: "I can go deeper into X if you'd like"
+
+## CONTENT STRUCTURE:
+1. Opening hook (1 line): Start with confidence, reference experience
+2. Technical core (2-3 points woven into prose): Config, process, key details
+3. Real-world touch (1 line): Error scenario or metric
+4. Close (1 line): Follow-up offer
+
+## SPEAKABILITY RULES:
+- No abbreviation dumps: weave terms into natural sentences
+- No bullet points or numbered lists in output
+- Use pauses naturally: em-dashes, commas for breathing room
+- Technical terms should flow: "I run MIGO for goods receipt, then MIRO for invoice verification"
+
+## EXAMPLE OUTPUT:
+
+"So intercompany stock transfers are something I've configured multiple times. The setup starts in SPRO under Materials Management — you define the shipping data between plants and set up the internal customer and vendor masters.
+
+For the actual process, it kicks off with ME21N using document type UB, then the supplying plant handles delivery through VL10B. The key thing is the automatic billing — SAP creates the intercompany invoice through the SD-MM integration, but if the pricing procedure isn't configured right, those invoices fail silently in VF04.
+
+At my last project, we processed about 2,000 of these monthly and I set up monitoring to catch anything stuck in GR/IR clearing. Happy to go deeper into the account flows if that's helpful."
+
+## CONTEXT HANDLING:
+If relevant context exists, personalize with specific client names, projects, and metrics.
+If no relevant context, use "In my experience..." or "The standard approach is..." framing."""
+        }
+    }
+
+
+def load_prompts_config() -> dict:
+    """
+    Load prompts config from YAML file.
+    Creates default config if file doesn't exist.
+    Falls back to defaults on parse error.
+    """
+    config_path = get_prompts_config_path()
+    defaults = get_default_prompts_config()
+
+    if not config_path.exists():
+        # Create default config file
+        save_prompts_config(defaults)
+        return defaults
+
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f)
+            if config is None:
+                return defaults
+            # Merge with defaults for any missing keys
+            merged = defaults.copy()
+            merged.update(config)
+            # Ensure nested dicts are merged
+            if "tones" in config:
+                merged["tones"] = {**defaults["tones"], **config["tones"]}
+            if "prompts" in config:
+                merged["prompts"] = {**defaults["prompts"], **config["prompts"]}
+            return merged
+    except (yaml.YAMLError, IOError) as e:
+        print(f"Warning: Failed to load prompts config: {e}")
+        print("Using default prompts.")
+        return defaults
+
+
+def save_prompts_config(config: dict) -> bool:
+    """
+    Save prompts config to YAML file.
+    Returns True on success, False on failure.
+    """
+    config_path = get_prompts_config_path()
+    try:
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        return True
+    except IOError as e:
+        print(f"Warning: Failed to save prompts config: {e}")
+        return False
+
+
 # Audio Configuration
+# Change this to match your audio output's monitor device
+# Run: pactl list sources short | grep monitor
+# Pick the one for your speakers (usually without _3, _4, _5 suffix - those are HDMI)
 AUDIO_DEVICE = "alsa_output.pci-0000_00_1f.3-platform-skl_hda_dsp_generic.HiFi__hw_sofhdadsp__sink.monitor"
 AUDIO_SAMPLE_RATE = 16000  # Whisper expects 16kHz
 AUDIO_CHANNELS = 1  # Mono

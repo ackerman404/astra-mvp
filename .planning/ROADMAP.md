@@ -5,6 +5,7 @@
 - ✅ **v1.0 Latency Optimization** - Phases 1-4 (shipped)
 - ✅ **v2.0 GUI & Security** - Phases 1-4 (shipped 2026-01-20)
 - ✅ **v2.1 Dual-Pane Answers** - Phases 5-7 (shipped 2026-01-21)
+- ✅ **v2.2 Customization** - Phase 8 (shipped 2026-01-21)
 
 ## Phases
 
@@ -15,6 +16,7 @@
 - [x] **Phase 5: Dual-Pane Layout** - Vertical split with question + two answer panes
 - [x] **Phase 6: Answer Formats** - Bullet points and conversational script prompts
 - [x] **Phase 7: Parallel Generation** - Concurrent LLM calls for both formats
+- [x] **Phase 8: Customizable Prompts & Settings** - YAML-based config for prompts, job context, tone
 
 ## Phase Details
 
@@ -65,16 +67,33 @@ Plans:
 Plans:
 - [x] 07-01: Parallel LLM execution
 
+### Phase 8: Customizable Prompts & Settings
+**Goal**: Make LLM prompts, job context, and tone configurable via YAML file
+**Depends on**: Phase 7 (uses existing prompt infrastructure)
+**Requirements**: CUSTOM-01, CUSTOM-02, CUSTOM-03, CUSTOM-04
+**Success Criteria** (what must be TRUE):
+  1. YAML config file at ~/.config/astra/prompts.yaml stores all prompts
+  2. Job context input in main window affects generated answers
+  3. Tone dropdown allows selection (professional, casual, confident, custom)
+  4. Reload Config button refreshes settings without restart
+  5. Invalid YAML gracefully falls back to defaults
+**Research**: Unlikely (YAML loading, existing config patterns)
+**Plans**: 1 plan
+
+Plans:
+- [x] 08-01: YAML config and GUI controls
+
 ## Progress
 
 **Execution Order:**
-Phases execute in order: 5 → 6 → 7
+Phases execute in order: 5 → 6 → 7 → 8
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Dual-Pane Layout | 1/1 | Complete | 2026-01-21 |
 | 6. Answer Formats | 1/1 | Complete | 2026-01-21 |
 | 7. Parallel Generation | 1/1 | Complete | 2026-01-21 |
+| 8. Customizable Prompts | 1/1 | Complete | 2026-01-21 |
 
 ---
 

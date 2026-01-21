@@ -22,6 +22,9 @@ CHUNK_OVERLAP = 50
 COLLECTION_NAME = "astra_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
+# Cross-platform path for ChromaDB
+CHROMA_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+
 
 def read_txt_file(file_path: Path) -> str:
     """Read content from a .txt or .md file."""
@@ -229,7 +232,7 @@ def ingest_folder_with_progress(
     openai_client = OpenAI(api_key=api_key)
 
     # Initialize ChromaDB
-    chroma_client = chromadb.PersistentClient(path="./chroma_db")
+    chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
 
     # Get or create collection
     collection = chroma_client.get_or_create_collection(

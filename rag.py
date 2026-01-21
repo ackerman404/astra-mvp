@@ -5,16 +5,23 @@ Searches ChromaDB for relevant document chunks.
 """
 
 from collections.abc import Generator
+import os
 
 import chromadb
 from openai import OpenAI
 import json
 
-from config import get_api_key
+from config import get_api_key, load_prompts_config
+
+# Cross-platform path for ChromaDB
+CHROMA_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 
 COLLECTION_NAME = "astra_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CLASSIFICATION_MODEL = "gpt-4o-mini"
+
+# Config cache
+_prompts_config = None
 
 
 def search_context(query: str, top_k: int = 5) -> list[dict]:
@@ -24,19 +31,34 @@ def search_context(query: str, top_k: int = 5) -> list[dict]:
     1. Embed the query using OpenAI text-embedding-3-small
     2. Search ChromaDB for top_k similar chunks
     3. Return list of {text, source_file, similarity_score}
+
+    Returns empty list if no documents ingested (graceful fallback).
     """
-    # Initialize clients
+    # Check if chroma_db exists at all
+    if not os.path.exists(CHROMA_DB_PATH):
+        return []
+
+    # Initialize ChromaDB client
+    try:
+        chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+    except Exception:
+        return []
+
+    # Get collection - return empty if doesn't exist
+    try:
+        collection = chroma_client.get_collection(name=COLLECTION_NAME)
+    except (ValueError, Exception):
+        return []
+
+    # Check if collection has any documents
+    if collection.count() == 0:
+        return []
+
+    # Now we know documents exist, get API key for embedding
     api_key = get_api_key()
     if not api_key:
         raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
     openai_client = OpenAI(api_key=api_key)
-    chroma_client = chromadb.PersistentClient(path="./chroma_db")
-
-    # Get collection
-    try:
-        collection = chroma_client.get_collection(name=COLLECTION_NAME)
-    except ValueError:
-        return []
 
     # Embed the query
     response = openai_client.embeddings.create(
@@ -71,7 +93,7 @@ def search_context(query: str, top_k: int = 5) -> list[dict]:
     return formatted_results
 
 
-CLASSIFICATION_PROMPT = """You are an interview question classifier. Given text from an interviewer, determine:
+DEFAULT_CLASSIFICATION_PROMPT = """You are an interview question classifier. Given text from an interviewer, determine:
 1. Is this a question that requires the candidate to give a substantive answer?
 2. What type of question is it?
 
@@ -131,7 +153,7 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
         response = openai_client.chat.completions.create(
             model=CLASSIFICATION_MODEL,
             messages=[
-                {"role": "system", "content": CLASSIFICATION_PROMPT},
+                {"role": "system", "content": get_prompt("classification")},
                 {"role": "user", "content": f"Classify this: \"{text}\""}
             ],
             max_tokens=100,
@@ -169,7 +191,7 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
         }
 
 
-STAR_SYSTEM_PROMPT = """You are an AI interview copilot for SAP Consultants, helping a candidate answer live interview questions in real-time.
+DEFAULT_STAR_SYSTEM_PROMPT = """You are an AI interview copilot for SAP Consultants, helping a candidate answer live interview questions in real-time.
 
 ## YOUR ROLE:
 - Give impressive, technically rich answers filled with configurations, master data, transaction codes, and business process flows
@@ -286,7 +308,7 @@ That answer can be spoken verbatim. Notice:
 """
 
 
-BULLET_SYSTEM_PROMPT = """You are an interview answer assistant generating quick-reference bullet points.
+DEFAULT_BULLET_SYSTEM_PROMPT = """You are an interview answer assistant generating quick-reference bullet points.
 
 ## YOUR TASK:
 Generate exactly 2-3 concise bullet points that capture the essential answer to an interview question.
@@ -318,7 +340,7 @@ If no relevant context, use general SAP best practices.
 """
 
 
-SCRIPT_SYSTEM_PROMPT = """You are an AI interview copilot generating speakable interview scripts.
+DEFAULT_SCRIPT_SYSTEM_PROMPT = """You are an AI interview copilot generating speakable interview scripts.
 
 ## YOUR TASK:
 Generate a natural, conversational answer that the candidate can read aloud verbatim during a live interview.
@@ -359,11 +381,68 @@ If no relevant context, use "In my experience..." or "The standard approach is..
 """
 
 
-TONE_INSTRUCTIONS = {
+DEFAULT_TONE_INSTRUCTIONS = {
     "professional": "Use formal but warm language. Sound composed and authoritative. Speak as a senior consultant to a peer.",
     "casual": "Use relaxed, friendly language. Sound approachable and conversational. Speak as if chatting with a colleague.",
     "confident": "Use assertive, direct language. Sound self-assured and commanding. Speak with energy and conviction."
 }
+
+
+# Config helper functions
+def _get_config() -> dict:
+    """Get cached prompts config, loading if needed."""
+    global _prompts_config
+    if _prompts_config is None:
+        _prompts_config = load_prompts_config()
+    return _prompts_config
+
+
+def reload_prompts_config() -> None:
+    """Force reload prompts config from YAML file."""
+    global _prompts_config
+    _prompts_config = load_prompts_config()
+
+
+def get_prompt(name: str) -> str:
+    """Get prompt by name from config with fallback to default."""
+    config = _get_config()
+    prompts = config.get("prompts", {})
+
+    # Map config names to default constants
+    defaults = {
+        "classification": DEFAULT_CLASSIFICATION_PROMPT,
+        "bullet_system": DEFAULT_BULLET_SYSTEM_PROMPT,
+        "script_system": DEFAULT_SCRIPT_SYSTEM_PROMPT,
+        "star_system": DEFAULT_STAR_SYSTEM_PROMPT,
+    }
+
+    return prompts.get(name, defaults.get(name, ""))
+
+
+def get_tone_instruction(tone: str) -> str:
+    """Get tone instruction text from config."""
+    config = _get_config()
+    tones = config.get("tones", DEFAULT_TONE_INSTRUCTIONS)
+    return tones.get(tone, tones.get("professional", DEFAULT_TONE_INSTRUCTIONS["professional"]))
+
+
+def get_default_job_context() -> str:
+    """Get default job context from config."""
+    config = _get_config()
+    return config.get("job_context", "")
+
+
+def get_default_tone() -> str:
+    """Get default tone from config."""
+    config = _get_config()
+    return config.get("default_tone", "professional")
+
+
+def get_available_tones() -> list[str]:
+    """Get list of available tone names from config."""
+    config = _get_config()
+    tones = config.get("tones", DEFAULT_TONE_INSTRUCTIONS)
+    return list(tones.keys())
 
 
 def generate_star_response(question: str, context_chunks: list[dict], job_context: str = "") -> Generator[str, None, None]:
@@ -417,7 +496,7 @@ Give a confident, technically rich answer the candidate can speak out loud verba
     stream = openai_client.chat.completions.create(
         model="gpt-4o",
         messages=[
-            {"role": "system", "content": STAR_SYSTEM_PROMPT},
+            {"role": "system", "content": get_prompt("star_system") or DEFAULT_STAR_SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ],
         stream=True,
@@ -486,7 +565,7 @@ Generate exactly 2-3 bullet points. Be concise and technical."""
     stream = openai_client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
-            {"role": "system", "content": BULLET_SYSTEM_PROMPT},
+            {"role": "system", "content": get_prompt("bullet_system") or DEFAULT_BULLET_SYSTEM_PROMPT},
             {"role": "user", "content": user_message}
         ],
         stream=True,
@@ -514,11 +593,12 @@ def generate_script_response(question: str, context_chunks: list[dict], job_cont
         raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
     openai_client = OpenAI(api_key=api_key)
 
-    # Get tone instruction
-    tone_instruction = TONE_INSTRUCTIONS.get(tone, TONE_INSTRUCTIONS["professional"])
+    # Get tone instruction from config
+    tone_instruction = get_tone_instruction(tone)
 
     # Format the prompt with tone
-    system_prompt = SCRIPT_SYSTEM_PROMPT.format(tone_instruction=tone_instruction)
+    script_prompt = get_prompt("script_system") or DEFAULT_SCRIPT_SYSTEM_PROMPT
+    system_prompt = script_prompt.format(tone_instruction=tone_instruction)
 
     # Check if we have relevant context
     has_relevant_context = (

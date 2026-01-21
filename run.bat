@@ -1,4 +1,8 @@
 @echo off
+
+REM Change to the directory where this script is located
+cd /d "%~dp0"
+
 echo Starting Astra Interview Copilot...
 echo.
 

@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QTextEdit,
+    QLineEdit,
     QComboBox,
     QProgressBar,
     QCheckBox,
@@ -32,7 +33,10 @@ from PyQt6.QtGui import QFont, QTextCursor
 
 from transcriber import transcribe_audio
 from audio_capture import get_audio_capture
-from rag import ask, ask_bullet, ask_script, classify_utterance
+from rag import (
+    ask, ask_bullet, ask_script, classify_utterance,
+    get_available_tones, get_default_job_context, get_default_tone, reload_prompts_config,
+)
 from config import (
     SILENCE_THRESHOLD,
     SILENCE_DURATION,
@@ -77,6 +81,56 @@ class IngestionSignals(QObject):
     """Signals for document ingestion progress."""
     progress = pyqtSignal(dict)  # Progress info dict
     complete = pyqtSignal(dict)  # Result summary dict
+
+
+class FitTextEdit(QTextEdit):
+    """QTextEdit that shrinks font to fit content without scrolling."""
+
+    def __init__(self, initial_font_size=16, min_font_size=10):
+        super().__init__()
+        self.setReadOnly(True)
+        self.initial_font_size = initial_font_size
+        self.min_font_size = min_font_size
+
+        # Show scrollbars only when content still exceeds after shrinking
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        font = QFont("Sans", initial_font_size)
+        self.setFont(font)
+
+    def reset_font(self):
+        """Reset to initial font size before new content."""
+        font = self.font()
+        font.setPointSize(self.initial_font_size)
+        self.setFont(font)
+
+    def finalize_content(self):
+        """Call after streaming completes to shrink font if needed."""
+        text = self.toPlainText()
+        if not text:
+            return
+
+        doc = self.document()
+        doc.adjustSize()
+        viewport_height = self.viewport().height()
+
+        # Only shrink if content exceeds viewport
+        if doc.size().height() <= viewport_height:
+            return
+
+        font = self.font()
+        size = self.initial_font_size
+
+        while size > self.min_font_size:
+            font.setPointSize(size)
+            self.setFont(font)
+            doc.adjustSize()
+
+            if doc.size().height() <= viewport_height:
+                break
+
+            size -= 1
 
 
 class StartupScreen(QWidget):
@@ -246,6 +300,7 @@ class AstraWindow(QMainWindow):
 
         # Layout mode state
         self.horizontal_layout = False
+        self.focus_mode = False
 
         self._init_ui()
         self._connect_signals()
@@ -334,9 +389,7 @@ class AstraWindow(QMainWindow):
         bullet_label.setStyleSheet("color: #333333;")
         left_layout.addWidget(bullet_label)
 
-        self.bullet_box = QTextEdit()
-        self.bullet_box.setReadOnly(True)
-        self.bullet_box.setFont(QFont("Sans", 16))
+        self.bullet_box = FitTextEdit(initial_font_size=16, min_font_size=10)
         self.bullet_box.setPlaceholderText("• Key point 1\n• Key point 2\n• Key point 3")
         self.bullet_box.setStyleSheet("""
             QTextEdit {
@@ -363,9 +416,7 @@ class AstraWindow(QMainWindow):
         script_label.setStyleSheet("color: #333333;")
         right_layout.addWidget(script_label)
 
-        self.script_box = QTextEdit()
-        self.script_box.setReadOnly(True)
-        self.script_box.setFont(QFont("Sans", 16))
+        self.script_box = FitTextEdit(initial_font_size=16, min_font_size=10)
         self.script_box.setPlaceholderText("Conversational script will appear here...")
         self.script_box.setStyleSheet("""
             QTextEdit {
@@ -460,6 +511,12 @@ class AstraWindow(QMainWindow):
 
         layout.addWidget(self.content_splitter, stretch=1)
 
+        # === CONTROLS CONTAINER (hideable in focus mode) ===
+        self.controls_container = QWidget()
+        controls_layout = QVBoxLayout(self.controls_container)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(10)
+
         # Audio source selection
         source_layout = QHBoxLayout()
         source_label = QLabel("Audio Source:")
@@ -509,7 +566,7 @@ class AstraWindow(QMainWindow):
         self.test_btn.clicked.connect(self._on_test_audio)
         source_layout.addWidget(self.test_btn)
 
-        layout.addLayout(source_layout)
+        controls_layout.addLayout(source_layout)
 
         # Auto-Answer Mode section
         auto_frame = QFrame()
@@ -564,7 +621,87 @@ class AstraWindow(QMainWindow):
         self.confidence_label.setFixedWidth(30)
         auto_layout.addWidget(self.confidence_label)
 
-        layout.addWidget(auto_frame)
+        controls_layout.addWidget(auto_frame)
+
+        # Settings section (Job Context, Tone, Reload Config)
+        settings_frame = QFrame()
+        settings_frame.setStyleSheet("""
+            QFrame {
+                background-color: rgba(248, 249, 250, 200);
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                padding: 5px;
+            }
+        """)
+        settings_layout = QHBoxLayout(settings_frame)
+        settings_layout.setContentsMargins(10, 5, 10, 5)
+        settings_layout.setSpacing(10)
+
+        # Job Context input
+        job_label = QLabel("Job:")
+        job_label.setFont(QFont("Sans", 9))
+        job_label.setStyleSheet("color: #555555;")
+        settings_layout.addWidget(job_label)
+
+        self.job_context_input = QLineEdit()
+        self.job_context_input.setPlaceholderText("e.g., Senior SAP MM Consultant")
+        self.job_context_input.setText(get_default_job_context())
+        self.job_context_input.setFont(QFont("Sans", 9))
+        self.job_context_input.setStyleSheet("""
+            QLineEdit {
+                background-color: rgba(255, 255, 255, 220);
+                color: #333333;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 4px 6px;
+            }
+        """)
+        self.job_context_input.setMinimumWidth(150)
+        settings_layout.addWidget(self.job_context_input, stretch=1)
+
+        # Tone dropdown
+        tone_label = QLabel("Tone:")
+        tone_label.setFont(QFont("Sans", 9))
+        tone_label.setStyleSheet("color: #555555;")
+        settings_layout.addWidget(tone_label)
+
+        self.tone_combo = QComboBox()
+        self.tone_combo.setFont(QFont("Sans", 9))
+        self.tone_combo.setStyleSheet("""
+            QComboBox {
+                background-color: rgba(255, 255, 255, 220);
+                color: #333333;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                padding: 4px 6px;
+            }
+            QComboBox::drop-down {
+                border: none;
+            }
+        """)
+        self._populate_tones()
+        settings_layout.addWidget(self.tone_combo)
+
+        # Reload Config button
+        self.reload_config_btn = QPushButton("⟳ Reload")
+        self.reload_config_btn.setFont(QFont("Sans", 9))
+        self.reload_config_btn.setToolTip("Reload prompts.yaml config")
+        self.reload_config_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(108, 117, 125, 200);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 10px;
+            }
+            QPushButton:hover {
+                background-color: rgba(90, 98, 104, 220);
+            }
+        """)
+        self.reload_config_btn.clicked.connect(self._on_reload_config)
+        settings_layout.addWidget(self.reload_config_btn)
+
+        controls_layout.addWidget(settings_frame)
 
         # State indicator with color
         self.state_frame = QFrame()
@@ -594,7 +731,7 @@ class AstraWindow(QMainWindow):
         self.queue_label.setStyleSheet("color: #666666;")
         state_layout.addWidget(self.queue_label)
 
-        layout.addWidget(self.state_frame)
+        controls_layout.addWidget(self.state_frame)
 
         # Audio level meter
         level_layout = QHBoxLayout()
@@ -621,7 +758,7 @@ class AstraWindow(QMainWindow):
         """)
         level_layout.addWidget(self.level_bar, stretch=1)
 
-        layout.addLayout(level_layout)
+        controls_layout.addLayout(level_layout)
 
         # Control buttons
         btn_layout = QHBoxLayout()
@@ -667,7 +804,10 @@ class AstraWindow(QMainWindow):
         self.answer_btn.clicked.connect(self._on_get_answer)
         btn_layout.addWidget(self.answer_btn)
 
-        layout.addLayout(btn_layout)
+        controls_layout.addLayout(btn_layout)
+
+        # Add controls container to main layout
+        layout.addWidget(self.controls_container)
 
         # === TITLE AT BOTTOM ===
         title_layout = QHBoxLayout()
@@ -680,6 +820,25 @@ class AstraWindow(QMainWindow):
         title_layout.addWidget(title)
 
         title_layout.addStretch()
+
+        # Focus mode button (shows only answers)
+        self.focus_btn = QPushButton("👁 Focus")
+        self.focus_btn.setFont(QFont("Sans", 10))
+        self.focus_btn.setToolTip("Toggle focus mode (show only answers)")
+        self.focus_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(74, 144, 217, 200);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 10px;
+            }
+            QPushButton:hover {
+                background-color: rgba(58, 123, 200, 220);
+            }
+        """)
+        self.focus_btn.clicked.connect(self._toggle_focus_mode)
+        title_layout.addWidget(self.focus_btn)
 
         # Layout toggle button
         self.layout_toggle_btn = QPushButton("⇕")
@@ -739,6 +898,36 @@ class AstraWindow(QMainWindow):
 
         except Exception as e:
             self.device_combo.addItem(f"Error: {e}", None)
+
+    def _populate_tones(self):
+        """Populate tone dropdown with available tones from config."""
+        self.tone_combo.clear()
+        tones = get_available_tones()
+        default_tone = get_default_tone()
+
+        for tone in tones:
+            self.tone_combo.addItem(tone.capitalize(), tone)
+
+        # Set default tone as selected
+        idx = self.tone_combo.findData(default_tone)
+        if idx >= 0:
+            self.tone_combo.setCurrentIndex(idx)
+
+    def _on_reload_config(self):
+        """Reload prompts config from YAML file."""
+        reload_prompts_config()
+        # Refresh tone dropdown
+        current_tone = self.tone_combo.currentData()
+        self._populate_tones()
+        # Try to restore previous selection
+        idx = self.tone_combo.findData(current_tone)
+        if idx >= 0:
+            self.tone_combo.setCurrentIndex(idx)
+        # Update job context if changed in config
+        default_job = get_default_job_context()
+        if default_job and not self.job_context_input.text():
+            self.job_context_input.setText(default_job)
+        self.status_label.setText("Status: Config reloaded")
 
     def _connect_signals(self):
         """Connect thread-safe signals to UI updates."""
@@ -973,6 +1162,7 @@ class AstraWindow(QMainWindow):
             # Clear answer boxes and generate both formats in parallel
             self.signals.answer_clear.emit()
             self._generate_parallel(question)
+            self.signals.answer_done.emit()
 
             self.signals.state_changed.emit(ListeningState.LISTENING)
 
@@ -1032,8 +1222,12 @@ class AstraWindow(QMainWindow):
         except Exception as e:
             self.signals.error_occurred.emit(str(e))
 
-    def _generate_parallel(self, question: str, job_context: str = ""):
+    def _generate_parallel(self, question: str):
         """Generate bullet and script responses in parallel threads."""
+        # Get settings from UI
+        job_context = self.job_context_input.text().strip()
+        tone = self.tone_combo.currentData() or "professional"
+
         def stream_bullets():
             try:
                 for token in ask_bullet(question, job_context):
@@ -1043,7 +1237,7 @@ class AstraWindow(QMainWindow):
 
         def stream_script():
             try:
-                for token in ask_script(question, job_context):
+                for token in ask_script(question, job_context, tone):
                     self.signals.script_token.emit(token)
             except Exception as e:
                 self.signals.error_occurred.emit(f"Script generation error: {e}")
@@ -1113,6 +1307,10 @@ class AstraWindow(QMainWindow):
 
     def _on_answer_done(self):
         """Processing complete."""
+        # Shrink fonts to fit content without scrolling
+        self.bullet_box.finalize_content()
+        self.script_box.finalize_content()
+
         if self.is_listening:
             self.status_label.setText("Status: Listening to system audio...")
             self.answer_btn.setEnabled(True)
@@ -1123,19 +1321,33 @@ class AstraWindow(QMainWindow):
         self.level_bar.setValue(0)
 
     def _on_answer_clear(self):
-        """Clear answer boxes (thread-safe via signal)."""
+        """Clear answer boxes and reset font (thread-safe via signal)."""
         self.bullet_box.clear()
+        self.bullet_box.reset_font()
         self.script_box.clear()
+        self.script_box.reset_font()
 
     def _on_bullet_token(self, token: str):
-        """Append token to bullet_box."""
+        """Append token to bullet_box without scrolling."""
+        # Save scroll position
+        scrollbar = self.bullet_box.verticalScrollBar()
+        scroll_pos = scrollbar.value()
+        # Append text
         self.bullet_box.moveCursor(QTextCursor.MoveOperation.End)
         self.bullet_box.insertPlainText(token)
+        # Restore scroll to top
+        scrollbar.setValue(scroll_pos)
 
     def _on_script_token(self, token: str):
-        """Append token to script_box."""
+        """Append token to script_box without scrolling."""
+        # Save scroll position
+        scrollbar = self.script_box.verticalScrollBar()
+        scroll_pos = scrollbar.value()
+        # Append text
         self.script_box.moveCursor(QTextCursor.MoveOperation.End)
         self.script_box.insertPlainText(token)
+        # Restore scroll to top
+        scrollbar.setValue(scroll_pos)
 
     def _on_question_update(self, text: str):
         """Update question display label."""
@@ -1232,6 +1444,53 @@ class AstraWindow(QMainWindow):
             self.queue_label.setText(f"📋 {count} queued")
         else:
             self.queue_label.setText("")
+
+    def _toggle_focus_mode(self):
+        """Toggle focus mode - show only answer screens."""
+        self.focus_mode = not self.focus_mode
+
+        if self.focus_mode:
+            # Hide controls and question panel
+            self.controls_container.hide()
+            self.question_panel.hide()
+            self.status_label.hide()
+            # Update button appearance
+            self.focus_btn.setText("✖ Exit Focus")
+            self.focus_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(220, 53, 69, 200);
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(200, 35, 51, 220);
+                }
+            """)
+            # Give full space to answer area
+            self.content_splitter.setSizes([1, 0])
+        else:
+            # Show all controls
+            self.controls_container.show()
+            self.question_panel.show()
+            self.status_label.show()
+            # Reset button appearance
+            self.focus_btn.setText("👁 Focus")
+            self.focus_btn.setStyleSheet("""
+                QPushButton {
+                    background-color: rgba(74, 144, 217, 200);
+                    color: white;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 4px 10px;
+                }
+                QPushButton:hover {
+                    background-color: rgba(58, 123, 200, 220);
+                }
+            """)
+            # Restore splitter sizes
+            self.content_splitter.setSizes([350, 200])
 
     def _toggle_layout(self):
         """Toggle between horizontal and vertical layout."""

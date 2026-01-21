@@ -149,5 +149,34 @@ Which phases cover which requirements. Updated by create-roadmap.
 - Unmapped: 0 ✓
 
 ---
+
+## v2.2 Requirements (Complete)
+
+Requirements for customizable prompts and settings.
+
+### Customization
+
+- [x] **CUSTOM-01**: YAML config file at ~/.config/astra/prompts.yaml stores all prompts
+- [x] **CUSTOM-02**: Job context input in main window affects generated answers
+- [x] **CUSTOM-03**: Tone dropdown allows selection (professional, casual, confident)
+- [x] **CUSTOM-04**: Reload Config button refreshes settings without restart
+- [x] **CUSTOM-05**: Invalid YAML gracefully falls back to defaults
+
+## v2.2 Traceability
+
+| Requirement | Phase | Status |
+|-------------|-------|--------|
+| CUSTOM-01 | Phase 8 | Complete |
+| CUSTOM-02 | Phase 8 | Complete |
+| CUSTOM-03 | Phase 8 | Complete |
+| CUSTOM-04 | Phase 8 | Complete |
+| CUSTOM-05 | Phase 8 | Complete |
+
+**v2.2 Coverage:**
+- v2.2 requirements: 5 total
+- Mapped to phases: 5
+- Unmapped: 0 ✓
+
+---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-21 after Phase 5 completion*
+*Last updated: 2026-01-21 after Phase 8 completion*
