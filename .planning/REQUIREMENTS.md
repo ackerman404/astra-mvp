@@ -37,10 +37,10 @@ Requirements for dual-pane answer display with parallel generation.
 
 ### Dual-Pane Layout
 
-- [ ] **DUAL-01**: Vertical split layout with two answer panes side by side
-- [ ] **DUAL-02**: Question displayed at top of answer area (visible in both contexts)
-- [ ] **DUAL-03**: Left pane displays bullet point summary
-- [ ] **DUAL-04**: Right pane displays conversational script
+- [x] **DUAL-01**: Vertical split layout with two answer panes side by side
+- [x] **DUAL-02**: Question displayed at top of answer area (visible in both contexts)
+- [x] **DUAL-03**: Left pane displays bullet point summary
+- [x] **DUAL-04**: Right pane displays conversational script
 
 ### Answer Formats
 
@@ -132,10 +132,10 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DUAL-01 | Phase 5 | Pending |
-| DUAL-02 | Phase 5 | Pending |
-| DUAL-03 | Phase 5 | Pending |
-| DUAL-04 | Phase 5 | Pending |
+| DUAL-01 | Phase 5 | Complete |
+| DUAL-02 | Phase 5 | Complete |
+| DUAL-03 | Phase 5 | Complete |
+| DUAL-04 | Phase 5 | Complete |
 | FMT-01 | Phase 6 | Pending |
 | FMT-02 | Phase 6 | Pending |
 | FMT-03 | Phase 6 | Pending |
@@ -150,4 +150,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-01-21 after v2.1 milestone start*
+*Last updated: 2026-01-21 after Phase 5 completion*
