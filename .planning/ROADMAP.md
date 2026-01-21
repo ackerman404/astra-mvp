@@ -13,7 +13,7 @@
 - Decimal phases (5.1, 5.2): Urgent insertions (marked with INSERTED)
 
 - [x] **Phase 5: Dual-Pane Layout** - Vertical split with question + two answer panes
-- [ ] **Phase 6: Answer Formats** - Bullet points and conversational script prompts
+- [x] **Phase 6: Answer Formats** - Bullet points and conversational script prompts
 - [ ] **Phase 7: Parallel Generation** - Concurrent LLM calls for both formats
 
 ## Phase Details
@@ -47,7 +47,7 @@ Plans:
 **Plans**: 1 plan
 
 Plans:
-- [ ] 06-01: Answer format prompts and generation
+- [x] 06-01: Answer format prompts and generation
 
 ### Phase 7: Parallel Generation
 **Goal**: Execute both LLM calls concurrently to maintain latency target
@@ -73,7 +73,7 @@ Phases execute in order: 5 → 6 → 7
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 5. Dual-Pane Layout | 1/1 | Complete | 2026-01-21 |
-| 6. Answer Formats | 0/1 | Not started | - |
+| 6. Answer Formats | 1/1 | Complete | 2026-01-21 |
 | 7. Parallel Generation | 0/1 | Not started | - |
 
 ---

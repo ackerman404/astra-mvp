@@ -31,7 +31,7 @@ from PyQt6.QtGui import QFont, QTextCursor
 
 from transcriber import transcribe_audio
 from audio_capture import get_audio_capture
-from rag import ask, classify_utterance
+from rag import ask, ask_bullet, classify_utterance
 from config import (
     SILENCE_THRESHOLD,
     SILENCE_DURATION,
@@ -966,10 +966,14 @@ class AstraWindow(QMainWindow):
             question = classification.get("cleaned_question", text)
             self.signals.transcription_ready.emit(question)
 
-            # Clear answer box and generate
+            # Update question display at top of answer area
+            self.signals.question_update.emit(question)
+
+            # Clear answer boxes and generate bullet points
             self.signals.answer_clear.emit()
-            for token in ask(question):
-                self.signals.answer_token.emit(token)
+            for token in ask_bullet(question):
+                self.signals.bullet_token.emit(token)
+            # TODO Phase 7: Add parallel script generation
 
             self.signals.state_changed.emit(ListeningState.LISTENING)
 
@@ -1017,10 +1021,14 @@ class AstraWindow(QMainWindow):
 
             self.signals.transcription_ready.emit(text)
 
-            # Get RAG answer
+            # Update question display at top of answer area
+            self.signals.question_update.emit(text)
+
+            # Get RAG answer (bullet points format)
             self.signals.status_update.emit("Status: Generating answer...")
-            for token in ask(text):
-                self.signals.answer_token.emit(token)
+            for token in ask_bullet(text):
+                self.signals.bullet_token.emit(token)
+            # TODO Phase 7: Add parallel script generation
 
             self.signals.answer_done.emit()
 
@@ -1095,8 +1103,9 @@ class AstraWindow(QMainWindow):
         self.level_bar.setValue(0)
 
     def _on_answer_clear(self):
-        """Clear answer box (thread-safe via signal)."""
-        self.answer_box.clear()
+        """Clear answer boxes (thread-safe via signal)."""
+        self.bullet_box.clear()
+        self.script_box.clear()
 
     def _on_bullet_token(self, token: str):
         """Append token to bullet_box."""

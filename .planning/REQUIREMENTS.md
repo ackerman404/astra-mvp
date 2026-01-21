@@ -44,9 +44,9 @@ Requirements for dual-pane answer display with parallel generation.
 
 ### Answer Formats
 
-- [ ] **FMT-01**: Bullet point format produces 2-3 key points maximum
-- [ ] **FMT-02**: Conversational script is humanized and readable aloud
-- [ ] **FMT-03**: Script tone is configurable (professional, casual, confident)
+- [x] **FMT-01**: Bullet point format produces 2-3 key points maximum
+- [x] **FMT-02**: Conversational script is humanized and readable aloud
+- [x] **FMT-03**: Script tone is configurable (professional, casual, confident)
 
 ### Parallel Generation
 
@@ -136,9 +136,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | DUAL-02 | Phase 5 | Complete |
 | DUAL-03 | Phase 5 | Complete |
 | DUAL-04 | Phase 5 | Complete |
-| FMT-01 | Phase 6 | Pending |
-| FMT-02 | Phase 6 | Pending |
-| FMT-03 | Phase 6 | Pending |
+| FMT-01 | Phase 6 | Complete |
+| FMT-02 | Phase 6 | Complete |
+| FMT-03 | Phase 6 | Complete |
 | PAR-01 | Phase 7 | Pending |
 | PAR-02 | Phase 7 | Pending |
 | PAR-03 | Phase 7 | Pending |

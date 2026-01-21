@@ -286,6 +286,86 @@ That answer can be spoken verbatim. Notice:
 """
 
 
+BULLET_SYSTEM_PROMPT = """You are an interview answer assistant generating quick-reference bullet points.
+
+## YOUR TASK:
+Generate exactly 2-3 concise bullet points that capture the essential answer to an interview question.
+
+## FORMAT RULES:
+- Exactly 2-3 bullet points, no more, no less
+- Each bullet: 1-2 sentences maximum
+- Start each bullet with "•"
+- Focus on: key terms, t-codes, config paths, critical concepts
+- This is for quick scanning, NOT for reading aloud
+
+## CONTENT FOCUS:
+- Technical essentials only
+- Specific SAP terms, transactions, tables when relevant
+- Key metrics or achievements from context
+- The "what" and "how", skip the "why" details
+
+## EXAMPLE:
+
+Question: "How do you handle intercompany stock transfers?"
+
+• Config: SPRO → MM → Purchasing → shipping data between plants; requires internal customer/vendor masters per plant
+• Process: ME21N (STO doc type UB) → VL10B (delivery) → MIGO GI/GR → auto-billing via SD-MM integration
+• Critical: Pricing procedure must be set in intercompany billing type or invoices fail silently in VF04
+
+## CONTEXT HANDLING:
+If relevant context exists, include specific client names, metrics, or achievements.
+If no relevant context, use general SAP best practices.
+"""
+
+
+SCRIPT_SYSTEM_PROMPT = """You are an AI interview copilot generating speakable interview scripts.
+
+## YOUR TASK:
+Generate a natural, conversational answer that the candidate can read aloud verbatim during a live interview.
+
+## TONE:
+{tone_instruction}
+
+## FORMAT RULES:
+- Write as flowing speech, NOT bullet points
+- Use complete sentences with natural transitions
+- Include verbal connectors: "The key thing here is...", "What's important to note...", "In my experience..."
+- Keep it concise: 150-250 words ideal
+- End with a follow-up offer: "I can go deeper into X if you'd like"
+
+## CONTENT STRUCTURE:
+1. Opening hook (1 line): Start with confidence, reference experience
+2. Technical core (2-3 points woven into prose): Config, process, key details
+3. Real-world touch (1 line): Error scenario or metric
+4. Close (1 line): Follow-up offer
+
+## SPEAKABILITY RULES:
+- No abbreviation dumps: weave terms into natural sentences
+- No bullet points or numbered lists in output
+- Use pauses naturally: em-dashes, commas for breathing room
+- Technical terms should flow: "I run MIGO for goods receipt, then MIRO for invoice verification"
+
+## EXAMPLE OUTPUT:
+
+"So intercompany stock transfers are something I've configured multiple times. The setup starts in SPRO under Materials Management — you define the shipping data between plants and set up the internal customer and vendor masters.
+
+For the actual process, it kicks off with ME21N using document type UB, then the supplying plant handles delivery through VL10B. The key thing is the automatic billing — SAP creates the intercompany invoice through the SD-MM integration, but if the pricing procedure isn't configured right, those invoices fail silently in VF04.
+
+At my last project, we processed about 2,000 of these monthly and I set up monitoring to catch anything stuck in GR/IR clearing. Happy to go deeper into the account flows if that's helpful."
+
+## CONTEXT HANDLING:
+If relevant context exists, personalize with specific client names, projects, and metrics.
+If no relevant context, use "In my experience..." or "The standard approach is..." framing.
+"""
+
+
+TONE_INSTRUCTIONS = {
+    "professional": "Use formal but warm language. Sound composed and authoritative. Speak as a senior consultant to a peer.",
+    "casual": "Use relaxed, friendly language. Sound approachable and conversational. Speak as if chatting with a colleague.",
+    "confident": "Use assertive, direct language. Sound self-assured and commanding. Speak with energy and conviction."
+}
+
+
 def generate_star_response(question: str, context_chunks: list[dict], job_context: str = "") -> Generator[str, None, None]:
     """
     Generate a SAP interview response using retrieved context.
@@ -353,6 +433,150 @@ def ask(question: str, job_context: str = "") -> Generator[str, None, None]:
     """Search context and generate streaming response."""
     chunks = search_context(question)
     return generate_star_response(question, chunks, job_context)
+
+
+def generate_bullet_response(question: str, context_chunks: list[dict], job_context: str = "") -> Generator[str, None, None]:
+    """
+    Generate a concise 2-3 bullet point response using retrieved context.
+    Uses gpt-4o-mini for speed since bullets are simple.
+    """
+    api_key = get_api_key()
+    if not api_key:
+        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
+    openai_client = OpenAI(api_key=api_key)
+
+    # Check if we have relevant context
+    has_relevant_context = (
+        len(context_chunks) > 0 and
+        any(chunk.get('similarity_score', 0) > 0.25 for chunk in context_chunks)
+    )
+
+    # Format context
+    if has_relevant_context:
+        context_text = "\n\n".join(
+            f"[{chunk['source_file']}]:\n{chunk['text']}"
+            for chunk in context_chunks
+            if chunk.get('similarity_score', 0) > 0.2
+        )
+        context_section = f"""
+CANDIDATE'S EXPERIENCE (use for personalization):
+{context_text}
+"""
+    else:
+        context_section = """
+CANDIDATE'S EXPERIENCE: No directly matching experience found.
+Use general SAP best practices.
+"""
+
+    # Add job context if available
+    job_section = ""
+    if job_context:
+        job_section = f"""
+JOB REQUIREMENTS:
+{job_context}
+"""
+
+    user_message = f"""{context_section}
+{job_section}
+
+INTERVIEW QUESTION: {question}
+
+Generate exactly 2-3 bullet points. Be concise and technical."""
+
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": BULLET_SYSTEM_PROMPT},
+            {"role": "user", "content": user_message}
+        ],
+        stream=True,
+        temperature=0.3  # More focused output for bullets
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
+def ask_bullet(question: str, job_context: str = "") -> Generator[str, None, None]:
+    """Search context and generate bullet point response."""
+    chunks = search_context(question)
+    return generate_bullet_response(question, chunks, job_context)
+
+
+def generate_script_response(question: str, context_chunks: list[dict], job_context: str = "", tone: str = "professional") -> Generator[str, None, None]:
+    """
+    Generate a humanized, speakable interview script using retrieved context.
+    Uses gpt-4o for quality since natural speech requires sophistication.
+    """
+    api_key = get_api_key()
+    if not api_key:
+        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
+    openai_client = OpenAI(api_key=api_key)
+
+    # Get tone instruction
+    tone_instruction = TONE_INSTRUCTIONS.get(tone, TONE_INSTRUCTIONS["professional"])
+
+    # Format the prompt with tone
+    system_prompt = SCRIPT_SYSTEM_PROMPT.format(tone_instruction=tone_instruction)
+
+    # Check if we have relevant context
+    has_relevant_context = (
+        len(context_chunks) > 0 and
+        any(chunk.get('similarity_score', 0) > 0.25 for chunk in context_chunks)
+    )
+
+    # Format context
+    if has_relevant_context:
+        context_text = "\n\n".join(
+            f"[{chunk['source_file']}]:\n{chunk['text']}"
+            for chunk in context_chunks
+            if chunk.get('similarity_score', 0) > 0.2
+        )
+        context_section = f"""
+CANDIDATE'S EXPERIENCE (personalize with this):
+{context_text}
+"""
+    else:
+        context_section = """
+CANDIDATE'S EXPERIENCE: No directly matching experience found.
+Use "In my experience..." framing with general SAP best practices.
+"""
+
+    # Add job context if available
+    job_section = ""
+    if job_context:
+        job_section = f"""
+JOB REQUIREMENTS (align answer to these):
+{job_context}
+"""
+
+    user_message = f"""{context_section}
+{job_section}
+
+INTERVIEW QUESTION: {question}
+
+Generate a natural, speakable answer (150-250 words) the candidate can read aloud verbatim."""
+
+    stream = openai_client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_message}
+        ],
+        stream=True,
+        temperature=0.7  # Creative for natural flow
+    )
+
+    for chunk in stream:
+        if chunk.choices[0].delta.content:
+            yield chunk.choices[0].delta.content
+
+
+def ask_script(question: str, job_context: str = "", tone: str = "professional") -> Generator[str, None, None]:
+    """Search context and generate script response with tone."""
+    chunks = search_context(question)
+    return generate_script_response(question, chunks, job_context, tone)
 
 
 if __name__ == "__main__":
