@@ -58,6 +58,7 @@ class SignalBridge(QObject):
     transcription_ready = pyqtSignal(str)
     answer_token = pyqtSignal(str)
     answer_done = pyqtSignal()
+    answer_clear = pyqtSignal()  # Clear answer box from background thread
     status_update = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
     audio_level = pyqtSignal(float)
@@ -65,6 +66,10 @@ class SignalBridge(QObject):
     state_changed = pyqtSignal(str)           # ListeningState value
     last_heard_update = pyqtSignal(str, str)  # text, status ("ignored"/"answering"/"")
     queue_update = pyqtSignal(int)            # Number of queued questions
+    # Dual-pane answer signals
+    bullet_token = pyqtSignal(str)            # Streaming token for bullet points
+    script_token = pyqtSignal(str)            # Streaming token for script
+    question_update = pyqtSignal(str)         # Update question display
 
 
 class IngestionSignals(QObject):
@@ -262,46 +267,197 @@ class AstraWindow(QMainWindow):
         self.setMinimumSize(450, 600)
         self.resize(600, 750)
 
+        # Make window semi-transparent
+        self.setWindowOpacity(0.92)
+
         # Central widget and layout
         central = QWidget()
-        central.setStyleSheet("background-color: #ffffff;")
+        central.setStyleSheet("background-color: rgba(255, 255, 255, 230);")
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
         layout.setSpacing(10)
         layout.setContentsMargins(15, 15, 15, 15)
 
-        # Title row with layout toggle button
-        title_layout = QHBoxLayout()
-        title_layout.addStretch()
-
-        title = QLabel("Astra Interview Copilot")
-        title.setFont(QFont("Sans", 14, QFont.Weight.Bold))
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("color: #222222;")
-        title_layout.addWidget(title)
-
-        title_layout.addStretch()
-
-        # Layout toggle button
-        self.layout_toggle_btn = QPushButton("⇕")
-        self.layout_toggle_btn.setFont(QFont("Sans", 14))
-        self.layout_toggle_btn.setFixedSize(32, 32)
-        self.layout_toggle_btn.setToolTip("Toggle horizontal/vertical layout")
-        self.layout_toggle_btn.setStyleSheet("""
-            QPushButton {
+        # === ANSWER/QUESTION SECTION AT TOP ===
+        # Splitter style shared between content_splitter and answer_splitter
+        splitter_style = """
+            QSplitter::handle {
                 background-color: #e0e0e0;
-                color: #333333;
-                border: 1px solid #ccc;
-                border-radius: 4px;
             }
-            QPushButton:hover {
-                background-color: #d0d0d0;
+            QSplitter::handle:horizontal {
+                width: 6px;
+            }
+            QSplitter::handle:vertical {
+                height: 6px;
+            }
+        """
+
+        # Create splitter for Question/Answer sections
+        self.content_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.content_splitter.setStyleSheet(splitter_style)
+
+        # Answer area container (TOP - most important)
+        self.answer_area = QWidget()
+        answer_area_layout = QVBoxLayout(self.answer_area)
+        answer_area_layout.setContentsMargins(0, 0, 0, 0)
+        answer_area_layout.setSpacing(5)
+
+        # Question display at top of answer area
+        self.question_display = QLabel("Waiting for question...")
+        self.question_display.setFont(QFont("Sans", 11))
+        self.question_display.setStyleSheet("""
+            QLabel {
+                color: #555555;
+                background-color: rgba(240, 244, 248, 200);
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 8px;
             }
         """)
-        self.layout_toggle_btn.clicked.connect(self._toggle_layout)
-        title_layout.addWidget(self.layout_toggle_btn)
+        self.question_display.setWordWrap(True)
+        answer_area_layout.addWidget(self.question_display)
 
-        layout.addLayout(title_layout)
+        # Horizontal splitter for dual answer panes
+        self.answer_splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.answer_splitter.setStyleSheet(splitter_style)
+        self.answer_splitter.setChildrenCollapsible(False)
+
+        # Left pane: Key Points (bullet_box)
+        left_pane = QWidget()
+        left_layout = QVBoxLayout(left_pane)
+        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(5)
+
+        bullet_label = QLabel("Key Points")
+        bullet_label.setFont(QFont("Sans", 10))
+        bullet_label.setStyleSheet("color: #333333;")
+        left_layout.addWidget(bullet_label)
+
+        self.bullet_box = QTextEdit()
+        self.bullet_box.setReadOnly(True)
+        self.bullet_box.setFont(QFont("Sans", 16))
+        self.bullet_box.setPlaceholderText("• Key point 1\n• Key point 2\n• Key point 3")
+        self.bullet_box.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(249, 249, 249, 220);
+                color: #222222;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        self.bullet_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        left_layout.addWidget(self.bullet_box, stretch=1)
+
+        self.answer_splitter.addWidget(left_pane)
+
+        # Right pane: Script (script_box)
+        right_pane = QWidget()
+        right_layout = QVBoxLayout(right_pane)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(5)
+
+        script_label = QLabel("Script")
+        script_label.setFont(QFont("Sans", 10))
+        script_label.setStyleSheet("color: #333333;")
+        right_layout.addWidget(script_label)
+
+        self.script_box = QTextEdit()
+        self.script_box.setReadOnly(True)
+        self.script_box.setFont(QFont("Sans", 16))
+        self.script_box.setPlaceholderText("Conversational script will appear here...")
+        self.script_box.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(249, 249, 249, 220);
+                color: #222222;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        self.script_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        right_layout.addWidget(self.script_box, stretch=1)
+
+        self.answer_splitter.addWidget(right_pane)
+
+        # Set answer splitter to 50/50 split
+        self.answer_splitter.setSizes([300, 300])
+
+        answer_area_layout.addWidget(self.answer_splitter, stretch=1)
+
+        # Backward compatibility: answer_box points to bullet_box
+        self.answer_box = self.bullet_box
+
+        self.content_splitter.addWidget(self.answer_area)
+
+        # Question panel (below answer)
+        self.question_panel = QWidget()
+        question_layout = QVBoxLayout(self.question_panel)
+        question_layout.setContentsMargins(0, 0, 0, 0)
+        question_layout.setSpacing(5)
+
+        # Transcription section (manual mode)
+        trans_label = QLabel("Question:")
+        trans_label.setFont(QFont("Sans", 10))
+        trans_label.setStyleSheet("color: #333333;")
+        question_layout.addWidget(trans_label)
+
+        self.transcription_box = QTextEdit()
+        self.transcription_box.setReadOnly(True)
+        self.transcription_box.setFont(QFont("Sans", 11))
+        self.transcription_box.setMinimumHeight(60)
+        self.transcription_box.setPlaceholderText("(transcription appears here)")
+        self.transcription_box.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(245, 245, 245, 220);
+                color: #333333;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                padding: 5px;
+            }
+        """)
+        self.transcription_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        question_layout.addWidget(self.transcription_box, stretch=1)
+
+        # Last heard section (for auto-mode)
+        last_heard_layout = QHBoxLayout()
+        last_heard_label = QLabel("Last heard:")
+        last_heard_label.setFont(QFont("Sans", 9))
+        last_heard_label.setStyleSheet("color: #666666;")
+        last_heard_layout.addWidget(last_heard_label)
+
+        self.last_heard_status = QLabel("")
+        self.last_heard_status.setFont(QFont("Sans", 9))
+        self.last_heard_status.setStyleSheet("color: #888888; font-style: italic;")
+        last_heard_layout.addWidget(self.last_heard_status)
+        last_heard_layout.addStretch()
+
+        question_layout.addLayout(last_heard_layout)
+
+        self.last_heard_box = QTextEdit()
+        self.last_heard_box.setReadOnly(True)
+        self.last_heard_box.setFont(QFont("Sans", 9))
+        self.last_heard_box.setMinimumHeight(40)
+        self.last_heard_box.setMaximumHeight(60)
+        self.last_heard_box.setPlaceholderText("(waiting for speech...)")
+        self.last_heard_box.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(250, 250, 250, 220);
+                color: #555555;
+                border: 1px solid #e0e0e0;
+                border-radius: 4px;
+                padding: 4px;
+            }
+        """)
+        question_layout.addWidget(self.last_heard_box)
+
+        self.content_splitter.addWidget(self.question_panel)
+
+        # Set initial splitter sizes (60% answer, 40% question)
+        self.content_splitter.setSizes([350, 200])
+        self.content_splitter.setChildrenCollapsible(False)
+
+        layout.addWidget(self.content_splitter, stretch=1)
 
         # Audio source selection
         source_layout = QHBoxLayout()
@@ -313,7 +469,7 @@ class AstraWindow(QMainWindow):
         self.device_combo = QComboBox()
         self.device_combo.setStyleSheet("""
             QComboBox {
-                background-color: #f5f5f5;
+                background-color: rgba(245, 245, 245, 220);
                 color: #333333;
                 border: 1px solid #ddd;
                 border-radius: 4px;
@@ -323,7 +479,7 @@ class AstraWindow(QMainWindow):
                 border: none;
             }
             QComboBox QAbstractItemView {
-                background-color: #ffffff;
+                background-color: rgba(255, 255, 255, 240);
                 color: #333333;
                 selection-background-color: #4a90d9;
             }
@@ -336,17 +492,17 @@ class AstraWindow(QMainWindow):
         self.test_btn.setFont(QFont("Sans", 10))
         self.test_btn.setStyleSheet("""
             QPushButton {
-                background-color: #6c757d;
+                background-color: rgba(108, 117, 125, 220);
                 color: white;
                 border: none;
                 border-radius: 4px;
                 padding: 5px 15px;
             }
             QPushButton:hover {
-                background-color: #5a6268;
+                background-color: rgba(90, 98, 104, 230);
             }
             QPushButton:disabled {
-                background-color: #cccccc;
+                background-color: rgba(204, 204, 204, 200);
             }
         """)
         self.test_btn.clicked.connect(self._on_test_audio)
@@ -358,7 +514,7 @@ class AstraWindow(QMainWindow):
         auto_frame = QFrame()
         auto_frame.setStyleSheet("""
             QFrame {
-                background-color: #f0f4f8;
+                background-color: rgba(240, 244, 248, 200);
                 border: 1px solid #ddd;
                 border-radius: 6px;
                 padding: 5px;
@@ -413,7 +569,7 @@ class AstraWindow(QMainWindow):
         self.state_frame = QFrame()
         self.state_frame.setStyleSheet("""
             QFrame {
-                background-color: #e8f4fd;
+                background-color: rgba(232, 244, 253, 200);
                 border: 1px solid #b8d4e8;
                 border-radius: 6px;
             }
@@ -455,10 +611,10 @@ class AstraWindow(QMainWindow):
             QProgressBar {
                 border: 1px solid #ddd;
                 border-radius: 4px;
-                background-color: #f5f5f5;
+                background-color: rgba(245, 245, 245, 200);
             }
             QProgressBar::chunk {
-                background-color: #28a745;
+                background-color: rgba(40, 167, 69, 220);
                 border-radius: 3px;
             }
         """)
@@ -474,16 +630,16 @@ class AstraWindow(QMainWindow):
         self.listen_btn.setMinimumHeight(50)
         self.listen_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4a90d9;
+                background-color: rgba(74, 144, 217, 230);
                 color: white;
                 border: none;
                 border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #3a7bc8;
+                background-color: rgba(58, 123, 200, 240);
             }
             QPushButton:disabled {
-                background-color: #cccccc;
+                background-color: rgba(204, 204, 204, 200);
             }
         """)
         self.listen_btn.clicked.connect(self._on_listen_toggle)
@@ -495,16 +651,16 @@ class AstraWindow(QMainWindow):
         self.answer_btn.setEnabled(False)
         self.answer_btn.setStyleSheet("""
             QPushButton {
-                background-color: #28a745;
+                background-color: rgba(40, 167, 69, 230);
                 color: white;
                 border: none;
                 border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background-color: rgba(33, 136, 56, 240);
             }
             QPushButton:disabled {
-                background-color: #cccccc;
+                background-color: rgba(204, 204, 204, 200);
             }
         """)
         self.answer_btn.clicked.connect(self._on_get_answer)
@@ -512,120 +668,42 @@ class AstraWindow(QMainWindow):
 
         layout.addLayout(btn_layout)
 
-        # Create splitter for Question/Answer sections
-        self.content_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.content_splitter.setStyleSheet("""
-            QSplitter::handle {
-                background-color: #e0e0e0;
-            }
-            QSplitter::handle:horizontal {
-                width: 6px;
-            }
-            QSplitter::handle:vertical {
-                height: 6px;
-            }
-        """)
+        # === TITLE AT BOTTOM ===
+        title_layout = QHBoxLayout()
+        title_layout.addStretch()
 
-        # Question panel (left/top in splitter)
-        self.question_panel = QWidget()
-        question_layout = QVBoxLayout(self.question_panel)
-        question_layout.setContentsMargins(0, 0, 0, 0)
-        question_layout.setSpacing(5)
+        title = QLabel("Astra Interview Copilot")
+        title.setFont(QFont("Sans", 11))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #888888;")
+        title_layout.addWidget(title)
 
-        # Last heard section (for auto-mode)
-        last_heard_layout = QHBoxLayout()
-        last_heard_label = QLabel("Last heard:")
-        last_heard_label.setFont(QFont("Sans", 9))
-        last_heard_label.setStyleSheet("color: #666666;")
-        last_heard_layout.addWidget(last_heard_label)
+        title_layout.addStretch()
 
-        self.last_heard_status = QLabel("")
-        self.last_heard_status.setFont(QFont("Sans", 9))
-        self.last_heard_status.setStyleSheet("color: #888888; font-style: italic;")
-        last_heard_layout.addWidget(self.last_heard_status)
-        last_heard_layout.addStretch()
-
-        question_layout.addLayout(last_heard_layout)
-
-        self.last_heard_box = QTextEdit()
-        self.last_heard_box.setReadOnly(True)
-        self.last_heard_box.setFont(QFont("Sans", 9))
-        self.last_heard_box.setMinimumHeight(40)
-        self.last_heard_box.setPlaceholderText("(waiting for speech...)")
-        self.last_heard_box.setStyleSheet("""
-            QTextEdit {
-                background-color: #fafafa;
-                color: #555555;
-                border: 1px solid #e0e0e0;
-                border-radius: 4px;
-                padding: 4px;
-            }
-        """)
-        question_layout.addWidget(self.last_heard_box)
-
-        # Transcription section (manual mode)
-        trans_label = QLabel("Question:")
-        trans_label.setFont(QFont("Sans", 10))
-        trans_label.setStyleSheet("color: #333333;")
-        question_layout.addWidget(trans_label)
-
-        self.transcription_box = QTextEdit()
-        self.transcription_box.setReadOnly(True)
-        self.transcription_box.setFont(QFont("Sans", 11))
-        self.transcription_box.setMinimumHeight(60)
-        self.transcription_box.setPlaceholderText("(transcription appears here)")
-        self.transcription_box.setStyleSheet("""
-            QTextEdit {
-                background-color: #f5f5f5;
+        # Layout toggle button
+        self.layout_toggle_btn = QPushButton("⇕")
+        self.layout_toggle_btn.setFont(QFont("Sans", 12))
+        self.layout_toggle_btn.setFixedSize(28, 28)
+        self.layout_toggle_btn.setToolTip("Toggle horizontal/vertical layout")
+        self.layout_toggle_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(224, 224, 224, 200);
                 color: #333333;
-                border: 1px solid #ddd;
+                border: 1px solid #ccc;
                 border-radius: 4px;
-                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: rgba(208, 208, 208, 220);
             }
         """)
-        self.transcription_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        question_layout.addWidget(self.transcription_box, stretch=1)
+        self.layout_toggle_btn.clicked.connect(self._toggle_layout)
+        title_layout.addWidget(self.layout_toggle_btn)
 
-        self.content_splitter.addWidget(self.question_panel)
-
-        # Answer panel (right/bottom in splitter)
-        self.answer_panel = QWidget()
-        answer_layout = QVBoxLayout(self.answer_panel)
-        answer_layout.setContentsMargins(0, 0, 0, 0)
-        answer_layout.setSpacing(5)
-
-        answer_label = QLabel("Answer:")
-        answer_label.setFont(QFont("Sans", 10))
-        answer_label.setStyleSheet("color: #333333;")
-        answer_layout.addWidget(answer_label)
-
-        self.answer_box = QTextEdit()
-        self.answer_box.setReadOnly(True)
-        self.answer_box.setFont(QFont("Sans", 16))
-        self.answer_box.setPlaceholderText("• bullet point 1\n• bullet point 2\n• bullet point 3")
-        self.answer_box.setStyleSheet("""
-            QTextEdit {
-                background-color: #f9f9f9;
-                color: #222222;
-                border: 1px solid #ddd;
-                border-radius: 4px;
-                padding: 8px;
-            }
-        """)
-        self.answer_box.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        answer_layout.addWidget(self.answer_box, stretch=1)
-
-        self.content_splitter.addWidget(self.answer_panel)
-
-        # Set initial splitter sizes (40% question, 60% answer)
-        self.content_splitter.setSizes([200, 300])
-        self.content_splitter.setChildrenCollapsible(False)
-
-        layout.addWidget(self.content_splitter, stretch=1)
+        layout.addLayout(title_layout)
 
         # Status bar
         self.status_label = QLabel("Status: Initializing...")
-        self.status_label.setFont(QFont("Sans", 10))
+        self.status_label.setFont(QFont("Sans", 9))
         self.status_label.setStyleSheet("color: #555555; background-color: transparent;")
         layout.addWidget(self.status_label)
 
@@ -666,6 +744,7 @@ class AstraWindow(QMainWindow):
         self.signals.transcription_ready.connect(self._on_transcription_ready)
         self.signals.answer_token.connect(self._on_answer_token)
         self.signals.answer_done.connect(self._on_answer_done)
+        self.signals.answer_clear.connect(self._on_answer_clear)
         self.signals.status_update.connect(self._on_status_update)
         self.signals.error_occurred.connect(self._on_error)
         self.signals.audio_level.connect(self._on_audio_level)
@@ -673,6 +752,10 @@ class AstraWindow(QMainWindow):
         self.signals.state_changed.connect(self._on_state_changed)
         self.signals.last_heard_update.connect(self._on_last_heard_update)
         self.signals.queue_update.connect(self._on_queue_update)
+        # Dual-pane answer signals
+        self.signals.bullet_token.connect(self._on_bullet_token)
+        self.signals.script_token.connect(self._on_script_token)
+        self.signals.question_update.connect(self._on_question_update)
 
     def _set_buttons_enabled(self, enabled: bool):
         """Enable/disable control buttons."""
@@ -884,7 +967,7 @@ class AstraWindow(QMainWindow):
             self.signals.transcription_ready.emit(question)
 
             # Clear answer box and generate
-            self.answer_box.clear()
+            self.signals.answer_clear.emit()
             for token in ask(question):
                 self.signals.answer_token.emit(token)
 
@@ -1010,6 +1093,24 @@ class AstraWindow(QMainWindow):
             self.status_label.setText("Status: Ready")
             self._set_buttons_enabled(True)
         self.level_bar.setValue(0)
+
+    def _on_answer_clear(self):
+        """Clear answer box (thread-safe via signal)."""
+        self.answer_box.clear()
+
+    def _on_bullet_token(self, token: str):
+        """Append token to bullet_box."""
+        self.bullet_box.moveCursor(QTextCursor.MoveOperation.End)
+        self.bullet_box.insertPlainText(token)
+
+    def _on_script_token(self, token: str):
+        """Append token to script_box."""
+        self.script_box.moveCursor(QTextCursor.MoveOperation.End)
+        self.script_box.insertPlainText(token)
+
+    def _on_question_update(self, text: str):
+        """Update question display label."""
+        self.question_display.setText(text)
 
     def _on_status_update(self, status: str):
         """Update status label."""
@@ -1192,7 +1293,9 @@ class AstraApp:
         """Handle document ingestion request."""
         import os
 
-        documents_path = "./documents/"
+        # Use absolute path relative to this script's location
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        documents_path = os.path.join(script_dir, "documents")
 
         # Check if documents folder exists
         if not os.path.exists(documents_path):
