@@ -8,6 +8,7 @@ import sys
 import threading
 import argparse
 from queue import Queue
+from concurrent.futures import ThreadPoolExecutor
 from PyQt6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -31,7 +32,7 @@ from PyQt6.QtGui import QFont, QTextCursor
 
 from transcriber import transcribe_audio
 from audio_capture import get_audio_capture
-from rag import ask, ask_bullet, classify_utterance
+from rag import ask, ask_bullet, ask_script, classify_utterance
 from config import (
     SILENCE_THRESHOLD,
     SILENCE_DURATION,
@@ -969,11 +970,9 @@ class AstraWindow(QMainWindow):
             # Update question display at top of answer area
             self.signals.question_update.emit(question)
 
-            # Clear answer boxes and generate bullet points
+            # Clear answer boxes and generate both formats in parallel
             self.signals.answer_clear.emit()
-            for token in ask_bullet(question):
-                self.signals.bullet_token.emit(token)
-            # TODO Phase 7: Add parallel script generation
+            self._generate_parallel(question)
 
             self.signals.state_changed.emit(ListeningState.LISTENING)
 
@@ -1024,16 +1023,37 @@ class AstraWindow(QMainWindow):
             # Update question display at top of answer area
             self.signals.question_update.emit(text)
 
-            # Get RAG answer (bullet points format)
-            self.signals.status_update.emit("Status: Generating answer...")
-            for token in ask_bullet(text):
-                self.signals.bullet_token.emit(token)
-            # TODO Phase 7: Add parallel script generation
+            # Generate both answer formats in parallel
+            self.signals.status_update.emit("Status: Generating answers...")
+            self._generate_parallel(text)
 
             self.signals.answer_done.emit()
 
         except Exception as e:
             self.signals.error_occurred.emit(str(e))
+
+    def _generate_parallel(self, question: str, job_context: str = ""):
+        """Generate bullet and script responses in parallel threads."""
+        def stream_bullets():
+            try:
+                for token in ask_bullet(question, job_context):
+                    self.signals.bullet_token.emit(token)
+            except Exception as e:
+                self.signals.error_occurred.emit(f"Bullet generation error: {e}")
+
+        def stream_script():
+            try:
+                for token in ask_script(question, job_context):
+                    self.signals.script_token.emit(token)
+            except Exception as e:
+                self.signals.error_occurred.emit(f"Script generation error: {e}")
+
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            bullet_future = executor.submit(stream_bullets)
+            script_future = executor.submit(stream_script)
+            # Wait for both to complete (futures handle exceptions internally)
+            bullet_future.result()
+            script_future.result()
 
     def _on_test_audio(self):
         """Test audio capture for 3 seconds."""

@@ -50,9 +50,9 @@ Requirements for dual-pane answer display with parallel generation.
 
 ### Parallel Generation
 
-- [ ] **PAR-01**: Both answer formats generated via parallel LLM calls
-- [ ] **PAR-02**: Total latency remains under 3 seconds (no sequential hit)
-- [ ] **PAR-03**: Both panes update when their respective response arrives
+- [x] **PAR-01**: Both answer formats generated via parallel LLM calls
+- [x] **PAR-02**: Total latency remains under 3 seconds (no sequential hit)
+- [x] **PAR-03**: Both panes update when their respective response arrives
 
 ---
 
@@ -139,9 +139,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 | FMT-01 | Phase 6 | Complete |
 | FMT-02 | Phase 6 | Complete |
 | FMT-03 | Phase 6 | Complete |
-| PAR-01 | Phase 7 | Pending |
-| PAR-02 | Phase 7 | Pending |
-| PAR-03 | Phase 7 | Pending |
+| PAR-01 | Phase 7 | Complete |
+| PAR-02 | Phase 7 | Complete |
+| PAR-03 | Phase 7 | Complete |
 
 **v2.1 Coverage:**
 - v2.1 requirements: 10 total

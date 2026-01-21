@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-01-21)
 
 ## Current Position
 
-Phase: 6 of 7 (Answer Formats)
+Phase: 7 of 7 (Parallel Generation)
 Plan: 01 complete
-Status: Ready for Phase 7
-Last activity: 2026-01-21 — Phase 6 answer formats complete
+Status: v2.1 MILESTONE COMPLETE
+Last activity: 2026-01-21 — Phase 7 parallel generation complete
 
-Progress: ████░░░░░░ 67% (Phase 5-6 complete, Phase 7 remaining)
+Progress: ██████████ 100% (All phases complete)
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 11
+- Total plans completed: 12
 - Average duration: ~4 min
-- Total execution time: ~43 min
+- Total execution time: ~46 min
 
 **By Phase:**
 
@@ -36,10 +36,11 @@ Progress: ████░░░░░░ 67% (Phase 5-6 complete, Phase 7 remain
 | v2.0 04-secure-api-key-handling | 1 | ~6 min | ~6 min |
 | v2.1 05-dual-pane-layout | 1 | ~5 min | ~5 min |
 | v2.1 06-answer-formats | 1 | ~5 min | ~5 min |
+| v2.1 07-parallel-generation | 1 | ~3 min | ~3 min |
 
 **Recent Trend:**
-- Last 4 plans: layout, security, dual-pane, answer-formats (all successful)
-- Trend: Stable
+- Last 4 plans: dual-pane, answer-formats, parallel-gen (all successful)
+- Trend: Stable - v2.1 milestone complete
 
 ## Accumulated Context
 
@@ -54,6 +55,7 @@ Recent decisions affecting current work:
 | v2.1-05 | answer_box alias to bullet_box | Backward compatibility for existing answer flow |
 | v2.1-06 | gpt-4o-mini for bullets, gpt-4o for script | Speed vs quality tradeoff per format |
 | v2.1-06 | Tone placeholder in script prompt | Dynamic injection without multiple prompts |
+| v2.1-07 | ThreadPoolExecutor for parallel generation | Simpler than asyncio, sync-friendly with OpenAI SDK |
 
 ### Pending Todos
 
@@ -72,5 +74,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-01-21
-Stopped at: Phase 6 (answer formats) complete, ready for Phase 7
+Stopped at: v2.1 milestone complete
 Resume file: None
