@@ -861,6 +861,52 @@ class AstraWindow(QMainWindow):
 
         layout.addLayout(title_layout)
 
+        # Focus mode toolbar (hidden by default, shown in focus mode)
+        self.focus_toolbar = QFrame()
+        self.focus_toolbar.setStyleSheet("""
+            QFrame {
+                background-color: rgba(240, 240, 240, 220);
+                border: 1px solid #ccc;
+                border-radius: 6px;
+            }
+        """)
+        focus_toolbar_layout = QHBoxLayout(self.focus_toolbar)
+        focus_toolbar_layout.setContentsMargins(10, 8, 10, 8)
+
+        # State indicator for focus mode
+        self.focus_state_indicator = QLabel("🔵")
+        self.focus_state_indicator.setFont(QFont("Sans", 16))
+        focus_toolbar_layout.addWidget(self.focus_state_indicator)
+
+        focus_toolbar_layout.addStretch()
+
+        # Get Answer button for focus mode
+        self.focus_answer_btn = QPushButton("💡 Get Answer")
+        self.focus_answer_btn.setFont(QFont("Sans", 12))
+        self.focus_answer_btn.setMinimumHeight(40)
+        self.focus_answer_btn.setMinimumWidth(150)
+        self.focus_answer_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(40, 167, 69, 230);
+                color: white;
+                border: none;
+                border-radius: 6px;
+            }
+            QPushButton:hover {
+                background-color: rgba(33, 136, 56, 240);
+            }
+            QPushButton:disabled {
+                background-color: rgba(204, 204, 204, 200);
+            }
+        """)
+        self.focus_answer_btn.clicked.connect(self._on_get_answer)
+        focus_toolbar_layout.addWidget(self.focus_answer_btn)
+
+        focus_toolbar_layout.addStretch()
+
+        self.focus_toolbar.hide()  # Hidden by default
+        layout.addWidget(self.focus_toolbar)
+
         # Status bar
         self.status_label = QLabel("Status: Initializing...")
         self.status_label.setFont(QFont("Sans", 9))
@@ -993,6 +1039,7 @@ class AstraWindow(QMainWindow):
                 }
             """)
             self.answer_btn.setEnabled(True)
+            self.focus_answer_btn.setEnabled(True)
             self.test_btn.setEnabled(False)
             self.device_combo.setEnabled(False)
 
@@ -1044,6 +1091,7 @@ class AstraWindow(QMainWindow):
             }
         """)
         self.answer_btn.setEnabled(False)
+        self.focus_answer_btn.setEnabled(False)
         self.test_btn.setEnabled(True)
         self.device_combo.setEnabled(True)
 
@@ -1183,8 +1231,10 @@ class AstraWindow(QMainWindow):
             return
 
         self.transcription_box.clear()
-        self.answer_box.clear()
+        # Clear both answer boxes and reset fonts
+        self._on_answer_clear()
         self.answer_btn.setEnabled(False)
+        self.focus_answer_btn.setEnabled(False)
         self.listen_btn.setEnabled(False)
 
         # Process in background thread
@@ -1314,6 +1364,7 @@ class AstraWindow(QMainWindow):
         if self.is_listening:
             self.status_label.setText("Status: Listening to system audio...")
             self.answer_btn.setEnabled(True)
+            self.focus_answer_btn.setEnabled(True)
             self.listen_btn.setEnabled(True)
         else:
             self.status_label.setText("Status: Ready")
@@ -1366,6 +1417,7 @@ class AstraWindow(QMainWindow):
         self.status_label.setText(f"Status: Error - {message}")
         if self.is_listening:
             self.answer_btn.setEnabled(True)
+            self.focus_answer_btn.setEnabled(True)
             self.listen_btn.setEnabled(True)
         else:
             self._set_buttons_enabled(True)
@@ -1422,6 +1474,8 @@ class AstraWindow(QMainWindow):
                 border-radius: 6px;
             }}
         """)
+        # Also update focus mode state indicator
+        self.focus_state_indicator.setText(indicator)
 
     def _on_last_heard_update(self, text: str, status: str):
         """Update the 'last heard' section."""
@@ -1454,8 +1508,11 @@ class AstraWindow(QMainWindow):
             self.controls_container.hide()
             self.question_panel.hide()
             self.status_label.hide()
+            # Show focus toolbar with Get Answer button and state indicator
+            self.focus_toolbar.show()
+            self.focus_answer_btn.setEnabled(self.is_listening)
             # Update button appearance
-            self.focus_btn.setText("✖ Exit Focus")
+            self.focus_btn.setText("✖ Exit")
             self.focus_btn.setStyleSheet("""
                 QPushButton {
                     background-color: rgba(220, 53, 69, 200);
@@ -1475,6 +1532,8 @@ class AstraWindow(QMainWindow):
             self.controls_container.show()
             self.question_panel.show()
             self.status_label.show()
+            # Hide focus toolbar
+            self.focus_toolbar.hide()
             # Reset button appearance
             self.focus_btn.setText("👁 Focus")
             self.focus_btn.setStyleSheet("""

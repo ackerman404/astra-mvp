@@ -131,7 +131,29 @@ if errorlevel 1 (
 REM Remove existing venv if present (may be from incompatible Python version)
 if exist venv (
     echo Removing existing virtual environment...
-    rmdir /s /q venv
+    echo This may take a moment...
+
+    REM Kill any Python processes that might lock the venv
+    taskkill /f /im python.exe >nul 2>&1
+    taskkill /f /im pythonw.exe >nul 2>&1
+
+    REM Wait a moment for processes to release files
+    timeout /t 2 /nobreak >nul
+
+    REM Try to remove the venv folder
+    rmdir /s /q venv 2>nul
+
+    REM If still exists, try again with del first
+    if exist venv (
+        del /f /s /q venv\* >nul 2>&1
+        rmdir /s /q venv 2>nul
+    )
+
+    if exist venv (
+        echo WARNING: Could not fully remove old venv. Proceeding anyway...
+    ) else (
+        echo Old virtual environment removed.
+    )
 )
 
 REM Create virtual environment
