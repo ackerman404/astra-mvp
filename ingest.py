@@ -140,13 +140,24 @@ def chunk_text(text: str, chunk_size: int = CHUNK_SIZE, overlap: int = CHUNK_OVE
     return chunks
 
 
-def get_embeddings(client: OpenAI, texts: list[str]) -> list[list[float]]:
-    """Get embeddings for a list of texts using OpenAI API."""
-    response = client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=texts
-    )
-    return [item.embedding for item in response.data]
+def get_embeddings(client: OpenAI, texts: list[str], batch_size: int = 1000) -> list[list[float]]:
+    """
+    Get embeddings for a list of texts using OpenAI API.
+
+    Batches requests to stay under OpenAI's 300k tokens per request limit.
+    With ~500 char chunks (~125 tokens each), 1000 chunks ≈ 125k tokens (safe margin).
+    """
+    all_embeddings = []
+
+    for i in range(0, len(texts), batch_size):
+        batch = texts[i:i + batch_size]
+        response = client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=batch
+        )
+        all_embeddings.extend([item.embedding for item in response.data])
+
+    return all_embeddings
 
 
 def get_doc_type(file_path: Path) -> str:
@@ -268,9 +279,12 @@ def ingest_folder_with_progress(
             if not chunks:
                 continue
 
-            # Get embeddings
+            # Get embeddings (batched for large documents)
             if not progress_callback:
-                print(f"  Generating embeddings...")
+                if file_chunks > 1000:
+                    print(f"  Generating embeddings ({file_chunks} chunks, this may take a moment)...")
+                else:
+                    print(f"  Generating embeddings...")
             embeddings = get_embeddings(openai_client, chunks)
 
             # Prepare data for ChromaDB

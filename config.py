@@ -36,7 +36,7 @@ def get_api_key() -> str | None:
         return None
 
     # Parse simple KEY=value format
-    with open(config_file, "r") as f:
+    with open(config_file, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
             if line.startswith("OPENAI_API_KEY="):
@@ -160,7 +160,7 @@ def load_prompts_config() -> dict:
         return defaults
 
     try:
-        with open(config_path, "r") as f:
+        with open(config_path, "r", encoding="utf-8") as f:
             config = yaml.safe_load(f)
             if config is None:
                 return defaults
@@ -186,7 +186,7 @@ def save_prompts_config(config: dict) -> bool:
     """
     config_path = get_prompts_config_path()
     try:
-        with open(config_path, "w") as f:
+        with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         return True
     except IOError as e:
