@@ -318,6 +318,13 @@ def ingest_folder_with_progress(
                 print(f"  {error_msg}")
             continue
 
+    # Invalidate BM25 cache so hybrid search rebuilds index with new documents
+    try:
+        from rag import invalidate_bm25_cache
+        invalidate_bm25_cache()
+    except ImportError:
+        pass  # rag module not available, skip
+
     # Report completion
     report("complete", message=f"Ingestion complete! {total_chunks} chunks added.",
            total_files=total_files, current_file_index=total_files - 1,

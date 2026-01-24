@@ -2,10 +2,12 @@
 """
 RAG retrieval module for Astra MVP.
 Searches ChromaDB for relevant document chunks.
+Supports hybrid search (dense + sparse) with Reciprocal Rank Fusion.
 """
 
 from collections.abc import Generator
 import os
+import re
 
 import chromadb
 from openai import OpenAI
@@ -20,44 +22,153 @@ COLLECTION_NAME = "astra_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
 CLASSIFICATION_MODEL = "gpt-4o-mini"
 
+# Hybrid search settings
+HYBRID_SEARCH_ENABLED = True  # Toggle hybrid search on/off
+RRF_K = 60  # RRF constant (standard value, higher = more weight to lower ranks)
+DENSE_WEIGHT = 0.5  # Weight for dense (embedding) results in fusion
+SPARSE_WEIGHT = 0.5  # Weight for sparse (BM25) results in fusion
+
 # Config cache
 _prompts_config = None
 
+# BM25 index cache
+_bm25_index = None
+_bm25_documents = None
+_bm25_doc_ids = None
+_bm25_metadatas = None
 
-def search_context(query: str, top_k: int = 5) -> list[dict]:
+
+def _tokenize(text: str) -> list[str]:
     """
-    Search for relevant document chunks based on a query.
-
-    1. Embed the query using OpenAI text-embedding-3-small
-    2. Search ChromaDB for top_k similar chunks
-    3. Return list of {text, source_file, similarity_score}
-
-    Returns empty list if no documents ingested (graceful fallback).
+    Simple tokenizer for BM25.
+    Lowercases, removes punctuation, splits on whitespace.
+    Preserves technical terms like 'tf2', 'ROS2', 'gpt-4o'.
     """
-    # Check if chroma_db exists at all
+    # Lowercase and replace punctuation with spaces (except hyphens in words)
+    text = text.lower()
+    # Keep alphanumeric, hyphens, underscores (common in technical terms)
+    text = re.sub(r'[^\w\s\-]', ' ', text)
+    # Split and filter empty strings
+    tokens = [t.strip() for t in text.split() if t.strip()]
+    return tokens
+
+
+def _load_bm25_index():
+    """
+    Load or rebuild BM25 index from ChromaDB documents.
+    Caches the index for subsequent queries.
+    """
+    global _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
+
+    # Check if already loaded
+    if _bm25_index is not None:
+        return _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
+
+    # Check if chroma_db exists
+    if not os.path.exists(CHROMA_DB_PATH):
+        return None, None, None, None
+
+    try:
+        chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        collection = chroma_client.get_collection(name=COLLECTION_NAME)
+    except Exception:
+        return None, None, None, None
+
+    if collection.count() == 0:
+        return None, None, None, None
+
+    # Load all documents from ChromaDB
+    all_docs = collection.get(include=["documents", "metadatas"])
+
+    if not all_docs["documents"]:
+        return None, None, None, None
+
+    _bm25_documents = all_docs["documents"]
+    _bm25_doc_ids = all_docs["ids"]
+    _bm25_metadatas = all_docs["metadatas"]
+
+    # Tokenize documents for BM25
+    tokenized_docs = [_tokenize(doc) for doc in _bm25_documents]
+
+    # Build BM25 index
+    try:
+        from rank_bm25 import BM25Okapi
+        _bm25_index = BM25Okapi(tokenized_docs)
+    except ImportError:
+        print("Warning: rank_bm25 not installed. Falling back to dense-only search.")
+        return None, None, None, None
+
+    return _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
+
+
+def invalidate_bm25_cache():
+    """
+    Invalidate BM25 cache. Call this after ingesting new documents.
+    """
+    global _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
+    _bm25_index = None
+    _bm25_documents = None
+    _bm25_doc_ids = None
+    _bm25_metadatas = None
+
+
+def _search_bm25(query: str, top_k: int = 20) -> list[dict]:
+    """
+    Search using BM25 (sparse retrieval).
+    Returns list of {text, source_file, bm25_score, doc_id, rank}.
+    """
+    bm25, documents, doc_ids, metadatas = _load_bm25_index()
+
+    if bm25 is None:
+        return []
+
+    # Tokenize query
+    query_tokens = _tokenize(query)
+
+    if not query_tokens:
+        return []
+
+    # Get BM25 scores for all documents
+    scores = bm25.get_scores(query_tokens)
+
+    # Get top-k indices
+    top_indices = sorted(range(len(scores)), key=lambda i: scores[i], reverse=True)[:top_k]
+
+    results = []
+    for rank, idx in enumerate(top_indices):
+        if scores[idx] > 0:  # Only include documents with non-zero score
+            results.append({
+                "text": documents[idx],
+                "source_file": metadatas[idx].get("source_file", "unknown"),
+                "bm25_score": float(scores[idx]),
+                "doc_id": doc_ids[idx],
+                "rank": rank + 1  # 1-indexed rank
+            })
+
+    return results
+
+
+def _search_dense(query: str, top_k: int = 20) -> list[dict]:
+    """
+    Search using dense embeddings (original method).
+    Returns list of {text, source_file, similarity_score, doc_id, rank}.
+    """
     if not os.path.exists(CHROMA_DB_PATH):
         return []
 
-    # Initialize ChromaDB client
     try:
         chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        collection = chroma_client.get_collection(name=COLLECTION_NAME)
     except Exception:
         return []
 
-    # Get collection - return empty if doesn't exist
-    try:
-        collection = chroma_client.get_collection(name=COLLECTION_NAME)
-    except (ValueError, Exception):
-        return []
-
-    # Check if collection has any documents
     if collection.count() == 0:
         return []
 
-    # Now we know documents exist, get API key for embedding
     api_key = get_api_key()
     if not api_key:
-        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
+        raise RuntimeError("OpenAI API key not configured.")
+
     openai_client = OpenAI(api_key=api_key)
 
     # Embed the query
@@ -74,23 +185,196 @@ def search_context(query: str, top_k: int = 5) -> list[dict]:
         include=["documents", "metadatas", "distances"]
     )
 
-    # Format results
     formatted_results = []
     if results["documents"] and results["documents"][0]:
-        for doc, metadata, distance in zip(
+        for rank, (doc, metadata, distance, doc_id) in enumerate(zip(
             results["documents"][0],
             results["metadatas"][0],
-            results["distances"][0]
-        ):
-            # ChromaDB returns cosine distance, convert to similarity
+            results["distances"][0],
+            results["ids"][0]
+        )):
             similarity_score = 1 - distance
             formatted_results.append({
                 "text": doc,
                 "source_file": metadata.get("source_file", "unknown"),
-                "similarity_score": similarity_score
+                "similarity_score": similarity_score,
+                "doc_id": doc_id,
+                "rank": rank + 1  # 1-indexed rank
             })
 
     return formatted_results
+
+
+def _reciprocal_rank_fusion(
+    dense_results: list[dict],
+    sparse_results: list[dict],
+    k: int = RRF_K,
+    dense_weight: float = DENSE_WEIGHT,
+    sparse_weight: float = SPARSE_WEIGHT
+) -> list[dict]:
+    """
+    Combine dense and sparse results using Reciprocal Rank Fusion (RRF).
+
+    RRF score = sum(weight / (k + rank)) for each result list
+
+    Args:
+        dense_results: Results from dense (embedding) search
+        sparse_results: Results from sparse (BM25) search
+        k: RRF constant (default 60)
+        dense_weight: Weight for dense results
+        sparse_weight: Weight for sparse results
+
+    Returns:
+        Fused and re-ranked results
+    """
+    # Build score map by doc_id
+    scores = {}  # doc_id -> {rrf_score, text, source_file, dense_score, sparse_score}
+
+    # Add dense results
+    for result in dense_results:
+        doc_id = result["doc_id"]
+        rrf_score = dense_weight / (k + result["rank"])
+
+        if doc_id not in scores:
+            scores[doc_id] = {
+                "text": result["text"],
+                "source_file": result["source_file"],
+                "rrf_score": 0,
+                "dense_score": result.get("similarity_score", 0),
+                "sparse_score": 0
+            }
+
+        scores[doc_id]["rrf_score"] += rrf_score
+        scores[doc_id]["dense_score"] = result.get("similarity_score", 0)
+
+    # Add sparse results
+    for result in sparse_results:
+        doc_id = result["doc_id"]
+        rrf_score = sparse_weight / (k + result["rank"])
+
+        if doc_id not in scores:
+            scores[doc_id] = {
+                "text": result["text"],
+                "source_file": result["source_file"],
+                "rrf_score": 0,
+                "dense_score": 0,
+                "sparse_score": result.get("bm25_score", 0)
+            }
+
+        scores[doc_id]["rrf_score"] += rrf_score
+        scores[doc_id]["sparse_score"] = result.get("bm25_score", 0)
+
+    # Sort by RRF score and format results
+    sorted_results = sorted(scores.items(), key=lambda x: x[1]["rrf_score"], reverse=True)
+
+    formatted_results = []
+    for doc_id, data in sorted_results:
+        formatted_results.append({
+            "text": data["text"],
+            "source_file": data["source_file"],
+            "similarity_score": data["rrf_score"],  # Use RRF score as similarity
+            "dense_score": data["dense_score"],
+            "sparse_score": data["sparse_score"],
+            "search_type": "hybrid"
+        })
+
+    return formatted_results
+
+
+def search_context(query: str, top_k: int = 5, use_hybrid: bool = None) -> list[dict]:
+    """
+    Search for relevant document chunks based on a query.
+
+    Uses hybrid search (dense + sparse with RRF fusion) by default for better
+    retrieval accuracy, especially for technical terms and keywords.
+
+    Args:
+        query: The search query
+        top_k: Number of results to return
+        use_hybrid: Override hybrid search setting. If None, uses HYBRID_SEARCH_ENABLED.
+
+    Returns:
+        List of {text, source_file, similarity_score} dicts.
+        Returns empty list if no documents ingested.
+    """
+    # Determine if we should use hybrid search
+    hybrid = use_hybrid if use_hybrid is not None else HYBRID_SEARCH_ENABLED
+
+    if hybrid:
+        return search_context_hybrid(query, top_k)
+    else:
+        return search_context_dense(query, top_k)
+
+
+def search_context_dense(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Search using only dense (embedding) retrieval.
+    Original search method - good for semantic similarity.
+    """
+    results = _search_dense(query, top_k)
+
+    # Format for compatibility (remove internal fields)
+    return [
+        {
+            "text": r["text"],
+            "source_file": r["source_file"],
+            "similarity_score": r["similarity_score"]
+        }
+        for r in results
+    ]
+
+
+def search_context_hybrid(query: str, top_k: int = 5) -> list[dict]:
+    """
+    Search using hybrid retrieval (dense + sparse with RRF fusion).
+
+    Combines:
+    - Dense search: Semantic similarity via embeddings (good for meaning)
+    - Sparse search: BM25 keyword matching (good for exact terms like 'tf2', 'EKF')
+
+    Results are fused using Reciprocal Rank Fusion for best of both worlds.
+    """
+    # Get more candidates than needed for better fusion
+    candidate_k = max(top_k * 4, 20)
+
+    # Run both searches
+    dense_results = _search_dense(query, candidate_k)
+    sparse_results = _search_bm25(query, candidate_k)
+
+    # If sparse search fails (no BM25 index), fall back to dense only
+    if not sparse_results:
+        return [
+            {
+                "text": r["text"],
+                "source_file": r["source_file"],
+                "similarity_score": r["similarity_score"]
+            }
+            for r in dense_results[:top_k]
+        ]
+
+    # If dense search fails, fall back to sparse only
+    if not dense_results:
+        return [
+            {
+                "text": r["text"],
+                "source_file": r["source_file"],
+                "similarity_score": r["bm25_score"] / 100  # Normalize BM25 score
+            }
+            for r in sparse_results[:top_k]
+        ]
+
+    # Fuse results using RRF
+    fused_results = _reciprocal_rank_fusion(dense_results, sparse_results)
+
+    # Return top_k results
+    return [
+        {
+            "text": r["text"],
+            "source_file": r["source_file"],
+            "similarity_score": r["similarity_score"]
+        }
+        for r in fused_results[:top_k]
+    ]
 
 
 DEFAULT_CLASSIFICATION_PROMPT = """You are an interview question classifier. Given text from an interviewer, determine:

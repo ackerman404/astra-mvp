@@ -9,6 +9,7 @@ numpy>=1.24.0,<2.0.0
 pdfplumber>=0.9.0
 platformdirs>=4.0.0
 pyyaml>=6.0.0
+rank_bm25>=0.2.2  # Sparse retrieval for hybrid search
 
 # Platform-specific audio dependencies
 PyAudioWPatch>=0.2.12; sys_platform == "win32"
