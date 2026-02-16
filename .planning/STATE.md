@@ -2,19 +2,19 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-01-21)
+See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Sub-3-second total response time from silence detection to answer display
-**Current focus:** v2.2 Customization milestone complete
+**Current focus:** v3.0 Online Distribution & License Gating
 
 ## Current Position
 
-Phase: 8 of 8 (Customizable Prompts & Settings) - COMPLETE
-Plan: 01 complete
-Status: v2.2 milestone shipped
-Last activity: 2026-01-21 — Phase 8 complete
+Phase: Not started (run /gsd:create-roadmap)
+Plan: —
+Status: Defining requirements
+Last activity: 2026-02-16 — Milestone v3.0 started
 
-Progress: ██████████ 100% (v2.2 complete)
+Progress: ░░░░░░░░░░ 0%
 
 ## Performance Metrics
 
@@ -74,9 +74,10 @@ None yet.
 - v2.0 complete: Startup screen, GUI ingestion, layout, security
 - v2.1 complete: Dual-pane answers with parallel generation
 - v2.2 complete: Customizable prompts and settings via YAML
+- v3.0 started: Online distribution with backend proxy and license gating
 
 ## Session Continuity
 
-Last session: 2026-01-21
-Stopped at: v2.2 milestone complete
+Last session: 2026-02-16
+Stopped at: v3.0 milestone initialized, needs roadmap
 Resume file: None
