@@ -5,12 +5,11 @@ import logging
 import time
 
 import openai
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from sqlmodel import Session
 
-from backend.auth import validate_license
 from backend.database import get_session
+from backend.middleware import check_rate_limit
 from backend.models import LicenseKey, UsageLog
 
 logger = logging.getLogger("astra.proxy")
@@ -56,7 +55,7 @@ def _error_json(code: str, message: str) -> dict:
 @router.post("/v1/chat/completions")
 async def proxy_chat_completions(
     request: Request,
-    license_key: LicenseKey = Depends(validate_license),
+    license_key: LicenseKey = Depends(check_rate_limit),
 ):
     """Proxy chat completion requests to OpenAI with streaming support."""
     openai_client = request.app.state.openai_client
