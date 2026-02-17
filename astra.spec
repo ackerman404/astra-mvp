@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for Astra Interview Copilot
 # Build with: pyinstaller astra.spec
-# Mode: --onefile (single portable Astra.exe)
+# Mode: --onedir (output bundled into installer by Inno Setup)
 
 import sys
 
@@ -71,14 +71,12 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# Single-file EXE — bundles everything into one portable Astra.exe
+# EXE launcher (binaries collected separately into dist/Astra/)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='Astra',
     debug=False,
     bootloader_ignore_signals=False,
@@ -91,4 +89,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,  # Add icon path if available: icon='assets/astra.ico'
+)
+
+# COLLECT gathers all files into dist/Astra/ — Inno Setup packages this into the installer
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,
+    upx_exclude=[],
+    name='Astra',
 )
