@@ -16,7 +16,7 @@
 
 - [x] **Phase 9: Backend Proxy & License Service** - FastAPI proxy server with license key validation and management CLI
 - [x] **Phase 10: Desktop App Integration** - Route LLM calls through proxy, remove client-side API key
-- [ ] **Phase 11: License Key UI & First-Run Experience** - Activation screen, error states, offline grace period
+- [x] **Phase 11: License Key UI & First-Run Experience** - Activation screen, error states, offline grace period
 - [ ] **Phase 12: Windows Installer & Distribution** - PyInstaller + Inno Setup packaging for Windows
 
 ## Phase Details
@@ -68,7 +68,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 11-01: License activation screen & first-run flow
+- [x] 11-01: License activation screen & first-run flow
 
 ### Phase 12: Windows Installer & Distribution
 **Goal**: Windows installer (.exe) via PyInstaller + Inno Setup, ready for distribution
@@ -95,7 +95,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 |-------|----------------|--------|-----------|
 | 9. Backend Proxy & License Service | 2/2 | Complete | 2026-02-17 |
 | 10. Desktop App Integration | 2/2 | Complete | 2026-02-17 |
-| 11. License Key UI & First-Run | 0/TBD | Not started | - |
+| 11. License Key UI & First-Run | 1/1 | Complete | 2026-02-17 |
 | 12. Windows Installer & Distribution | 0/TBD | Not started | - |
 
 ---

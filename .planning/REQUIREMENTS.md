@@ -203,9 +203,9 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIC-01 | Phase 11 | Pending |
+| LIC-01 | Phase 11 | Complete |
 | LIC-02 | Phase 9 | Complete |
-| LIC-03 | Phase 11 | Pending |
+| LIC-03 | Phase 11 | Complete |
 | LIC-04 | Phase 10 | Complete |
 | LIC-05 | Phase 9 | Complete |
 | LIC-06 | Phase 9 | Complete |
@@ -224,11 +224,11 @@ Which phases cover which requirements. Updated by create-roadmap.
 | APP-01 | Phase 10 | Complete |
 | APP-02 | Phase 10 | Complete |
 | APP-03 | Phase 10 | Complete |
-| FRX-01 | Phase 11 | Pending |
-| FRX-02 | Phase 11 | Pending |
-| FRX-03 | Phase 11 | Pending |
-| FRX-04 | Phase 11 | Pending |
-| FRX-05 | Phase 11 | Pending |
+| FRX-01 | Phase 11 | Complete |
+| FRX-02 | Phase 11 | Complete |
+| FRX-03 | Phase 11 | Complete |
+| FRX-04 | Phase 11 | Complete |
+| FRX-05 | Phase 11 | Complete |
 | MGMT-01 | Phase 9 | Complete |
 | MGMT-02 | Phase 9 | Complete |
 | MGMT-03 | Phase 9 | Complete |
@@ -292,4 +292,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-02-17 after Phase 10 completion*
+*Last updated: 2026-02-17 after Phase 11 completion*
