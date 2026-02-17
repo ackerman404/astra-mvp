@@ -36,7 +36,7 @@
 **Plans**: TBD
 
 Plans:
-- [ ] 09-01: TBD
+- [x] 09-01: Backend foundation & license key management
 - [ ] 09-02: TBD
 
 ### Phase 10: Desktop App Integration
@@ -92,7 +92,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Backend Proxy & License Service | 0/TBD | Not started | - |
+| 9. Backend Proxy & License Service | 1/2 | In progress | - |
 | 10. Desktop App Integration | 0/TBD | Not started | - |
 | 11. License Key UI & First-Run | 0/TBD | Not started | - |
 | 12. Windows Installer & Distribution | 0/TBD | Not started | - |
