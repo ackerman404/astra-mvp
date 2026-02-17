@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     DATABASE_URL: str = "sqlite:///./astra_backend.db"
     ALLOWED_MODELS: list[str] = ["gpt-4o", "gpt-4o-mini"]
+    ALLOWED_EMBEDDING_MODELS: list[str] = ["text-embedding-3-small"]
     RATE_LIMIT_COMPLETIONS_RPM: int = 20
     RATE_LIMIT_CLASSIFICATIONS_RPM: int = 60
     OPENAI_TIMEOUT_GENERATE: float = 60.0

@@ -1,4 +1,4 @@
-"""Chat completions proxy — forwards LLM requests to OpenAI with SSE streaming."""
+"""Proxy endpoints — forwards LLM and embedding requests to OpenAI."""
 
 import asyncio
 import logging
@@ -243,3 +243,129 @@ async def _call_openai_with_retry(client: openai.AsyncOpenAI, body: dict):
         # Wait 2 seconds and retry once
         await asyncio.sleep(2)
         return await client.chat.completions.create(**body)
+
+
+# ---------------------------------------------------------------------------
+# Embeddings proxy
+# ---------------------------------------------------------------------------
+
+
+async def _log_embeddings_usage(
+    license_key_id: int,
+    model: str,
+    total_tokens: int,
+    status_code: int,
+    latency_ms: float,
+) -> None:
+    """Fire-and-forget usage log insert for embeddings."""
+    try:
+        from backend.database import engine
+        from sqlmodel import Session as SyncSession
+
+        with SyncSession(engine) as session:
+            log = UsageLog(
+                license_key_id=license_key_id,
+                endpoint="embeddings",
+                model=model,
+                prompt_tokens=total_tokens,
+                completion_tokens=0,
+                status_code=status_code,
+                latency_ms=latency_ms,
+            )
+            session.add(log)
+            session.commit()
+    except Exception:
+        logger.exception("Failed to log embeddings usage")
+
+
+async def _call_embeddings_with_retry(client: openai.AsyncOpenAI, body: dict):
+    """Call OpenAI embeddings with a single retry on 429/500 errors."""
+    try:
+        return await client.embeddings.create(**body)
+    except (openai.RateLimitError, openai.InternalServerError):
+        # Wait 2 seconds and retry once
+        await asyncio.sleep(2)
+        return await client.embeddings.create(**body)
+
+
+@router.post("/v1/embeddings")
+async def proxy_embeddings(
+    request: Request,
+    license_key: LicenseKey = Depends(check_rate_limit),
+):
+    """Proxy embedding requests to OpenAI."""
+    openai_client = request.app.state.openai_client
+    if openai_client is None:
+        return JSONResponse(
+            status_code=502,
+            content=_error_json("upstream_auth", "AI service configuration error. Contact support."),
+        )
+
+    # Parse request body as-is (pass through to OpenAI, no Pydantic model)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(
+            status_code=400,
+            content=_error_json("invalid_request", "Request body must be valid JSON."),
+        )
+
+    # Model whitelist enforcement for embeddings
+    settings = request.app.state.settings
+    model = body.get("model", "")
+    if model not in settings.ALLOWED_EMBEDDING_MODELS:
+        return JSONResponse(
+            status_code=400,
+            content=_error_json(
+                "model_not_allowed",
+                f"Embedding model not permitted. Allowed: {', '.join(settings.ALLOWED_EMBEDDING_MODELS)}",
+            ),
+        )
+
+    start = time.monotonic()
+
+    try:
+        response = await _call_embeddings_with_retry(openai_client, body)
+    except openai.AuthenticationError:
+        return JSONResponse(
+            status_code=502,
+            content=_error_json("upstream_auth", "AI service configuration error. Contact support."),
+        )
+    except openai.RateLimitError:
+        return JSONResponse(
+            status_code=429,
+            content=_error_json("rate_limited", "Service is busy. Please wait a moment."),
+        )
+    except openai.APITimeoutError:
+        return JSONResponse(
+            status_code=504,
+            content=_error_json("timeout", "Request timed out. Please try again."),
+        )
+    except openai.APIConnectionError:
+        return JSONResponse(
+            status_code=502,
+            content=_error_json("upstream_unreachable", "Cannot reach AI service. Try again shortly."),
+        )
+    except openai.APIError:
+        return JSONResponse(
+            status_code=502,
+            content=_error_json("upstream_error", "AI service temporarily unavailable."),
+        )
+
+    latency_ms = (time.monotonic() - start) * 1000
+
+    # Extract usage
+    total_tokens = response.usage.total_tokens if response.usage else 0
+
+    # Fire-and-forget usage logging
+    asyncio.create_task(
+        _log_embeddings_usage(
+            license_key.id,
+            body.get("model", "unknown"),
+            total_tokens,
+            200,
+            latency_ms,
+        )
+    )
+
+    return response.model_dump()
