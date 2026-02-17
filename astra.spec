@@ -1,13 +1,14 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for Astra Interview Copilot
 # Build with: pyinstaller astra.spec
+# Mode: --onedir (avoids AV false positives, faster startup than --onefile)
 
 import sys
 from pathlib import Path
 
 block_cipher = None
 
-# Collect faster-whisper model files
+# Collect data files for bundled packages
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 datas = [
@@ -15,18 +16,41 @@ datas = [
     ('.env.example', '.'),
 ]
 
-# Collect faster-whisper assets
+# Collect faster-whisper assets (ONNX models, etc.)
 datas += collect_data_files('faster_whisper')
 
-# Hidden imports for PyQt6 and other packages
+# Collect chromadb data files (ONNX models, migration files)
+datas += collect_data_files('chromadb')
+
+# Hidden imports for PyQt6 and all v3.0 dependencies
 hiddenimports = [
+    # GUI framework
     'PyQt6.QtCore',
     'PyQt6.QtGui',
     'PyQt6.QtWidgets',
+    # Vector database
     'chromadb',
+    # LLM client
     'openai',
+    # Numerical
     'numpy',
+    # PDF parsing
     'pdfplumber',
+    # Config directory resolution
+    'platformdirs',
+    # License activation HTTP calls
+    'requests',
+    # Prompts config (pyyaml import name)
+    'yaml',
+    # Hybrid search (sparse retrieval)
+    'rank_bm25',
+    # Local audio capture module (dynamically imported)
+    'audio_capture',
+    # Environment variable loading
+    'dotenv',
+    # Crypto (explicit inclusion for some builds)
+    'hashlib',
+    'hmac',
 ]
 
 # Add Windows audio imports
@@ -51,20 +75,17 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
+# EXE contains only the launcher (scripts + pyz)
 exe = EXE(
     pyz,
     a.scripts,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
     [],
+    exclude_binaries=True,
     name='Astra',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
-    upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
+    upx=False,  # UPX disabled — triggers more AV false positives than it saves
     console=False,  # No console window for GUI app
     disable_windowed_traceback=False,
     argv_emulation=False,
@@ -72,4 +93,16 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,  # Add icon path if available: icon='assets/astra.ico'
+)
+
+# COLLECT gathers all binaries, data files, and dependencies into dist/Astra/
+coll = COLLECT(
+    exe,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
+    strip=False,
+    upx=False,  # UPX disabled — triggers more AV false positives than it saves
+    upx_exclude=[],
+    name='Astra',
 )
