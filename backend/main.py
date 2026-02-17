@@ -37,3 +37,8 @@ app = FastAPI(
     version="3.0.0",
     lifespan=lifespan,
 )
+
+# Include routers
+from backend.auth import router as license_router  # noqa: E402
+
+app.include_router(license_router)
