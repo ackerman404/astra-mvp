@@ -14,7 +14,7 @@
 - Integer phases (9, 10, 11, 12): Planned v3.0 milestone work
 - Decimal phases (9.1, 10.1): Urgent insertions (marked with INSERTED)
 
-- [ ] **Phase 9: Backend Proxy & License Service** - FastAPI proxy server with license key validation and management CLI
+- [x] **Phase 9: Backend Proxy & License Service** - FastAPI proxy server with license key validation and management CLI
 - [ ] **Phase 10: Desktop App Integration** - Route LLM calls through proxy, remove client-side API key
 - [ ] **Phase 11: License Key UI & First-Run Experience** - Activation screen, error states, offline grace period
 - [ ] **Phase 12: Windows Installer & Distribution** - PyInstaller + Inno Setup packaging for Windows
@@ -37,7 +37,7 @@
 
 Plans:
 - [x] 09-01: Backend foundation & license key management
-- [ ] 09-02: TBD
+- [x] 09-02: LLM proxy forwarding & reliability
 
 ### Phase 10: Desktop App Integration
 **Goal**: Desktop app routes all LLM calls through backend proxy using license key as auth, with no OpenAI API key on client
@@ -92,7 +92,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 9. Backend Proxy & License Service | 1/2 | In progress | - |
+| 9. Backend Proxy & License Service | 2/2 | Complete | 2026-02-17 |
 | 10. Desktop App Integration | 0/TBD | Not started | - |
 | 11. License Key UI & First-Run | 0/TBD | Not started | - |
 | 12. Windows Installer & Distribution | 0/TBD | Not started | - |
