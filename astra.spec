@@ -1,20 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 # PyInstaller spec file for Astra Interview Copilot
 # Build with: pyinstaller astra.spec
-# Mode: --onedir (avoids AV false positives, faster startup than --onefile)
+# Mode: --onefile (single portable Astra.exe)
 
 import sys
-from pathlib import Path
 
 block_cipher = None
 
 # Collect data files for bundled packages
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files
 
-datas = [
-    # Include any local data files
-    ('.env.example', '.'),
-]
+datas = []
 
 # Collect faster-whisper assets (ONNX models, etc.)
 datas += collect_data_files('faster_whisper')
@@ -75,12 +71,14 @@ a = Analysis(
 
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
-# EXE contains only the launcher (scripts + pyz)
+# Single-file EXE — bundles everything into one portable Astra.exe
 exe = EXE(
     pyz,
     a.scripts,
+    a.binaries,
+    a.zipfiles,
+    a.datas,
     [],
-    exclude_binaries=True,
     name='Astra',
     debug=False,
     bootloader_ignore_signals=False,
@@ -93,16 +91,4 @@ exe = EXE(
     codesign_identity=None,
     entitlements_file=None,
     icon=None,  # Add icon path if available: icon='assets/astra.ico'
-)
-
-# COLLECT gathers all binaries, data files, and dependencies into dist/Astra/
-coll = COLLECT(
-    exe,
-    a.binaries,
-    a.zipfiles,
-    a.datas,
-    strip=False,
-    upx=False,  # UPX disabled — triggers more AV false positives than it saves
-    upx_exclude=[],
-    name='Astra',
 )
