@@ -43,12 +43,13 @@
 - numpy - Audio buffer manipulation and RMS calculations (`transcriber.py`)
 - pdfplumber - PDF text extraction with layout preservation (`ingest.py`)
 - python-dotenv - Environment variable loading (`.env` file)
+- requests - HTTP calls for license activation/deactivation (`gui.py`)
 
 ## Configuration
 
 **Environment:**
-- `.env` file for OPENAI_API_KEY
-- No other environment variables required
+- `~/.config/astra/.env` for LICENSE_KEY and PROXY_URL (via platformdirs)
+- No OpenAI API key on desktop -- all LLM calls route through backend proxy
 
 **Build:**
 - `config.py` - Central configuration module with:

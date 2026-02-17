@@ -4,11 +4,12 @@
 
 ## APIs
 
-### OpenAI API
+### OpenAI API (via Backend Proxy)
 
 **Authentication:**
-- API key via `.env` file (OPENAI_API_KEY)
-- Loaded using `python-dotenv`
+- License key as Bearer token via backend proxy
+- All calls routed through proxy at `get_proxy_url()` (default: https://astra-proxy.up.railway.app/v1)
+- No direct OpenAI API key on desktop client
 
 **Models Used:**
 | Model | Purpose | Location |
@@ -132,7 +133,7 @@ Real-time Processing:
 
 | Service | Type | Location | Required |
 |---------|------|----------|----------|
-| OpenAI API | Cloud API | `rag.py`, `ingest.py` | Yes (API key) |
+| OpenAI API (via proxy) | Cloud API | `rag.py`, `ingest.py` | Yes (license key) |
 | ChromaDB | Local DB | `./chroma_db/` | Auto-created |
 | PipeWire/PulseAudio | System | Linux only | Yes |
 | Faster-Whisper | Local Model | `transcriber.py` | Auto-download |
