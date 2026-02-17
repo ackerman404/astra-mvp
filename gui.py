@@ -37,6 +37,8 @@ from rag import (
     ask, ask_bullet, ask_script, classify_utterance,
     get_available_tones, get_default_job_context, get_default_tone, reload_prompts_config,
 )
+import requests
+
 from config import (
     SILENCE_THRESHOLD,
     SILENCE_DURATION,
@@ -44,8 +46,12 @@ from config import (
     CLASSIFICATION_CONFIDENCE,
     MIN_WORDS_FOR_CLASSIFICATION,
     AUDIO_SAMPLE_RATE,
-    get_api_key,
-    get_config_path,
+    get_license_key,
+    get_proxy_url,
+    save_license_key,
+    clear_license_key,
+    get_hardware_id,
+    get_config_dir,
 )
 
 
@@ -821,6 +827,25 @@ class AstraWindow(QMainWindow):
 
         title_layout.addStretch()
 
+        # Deactivate license button
+        self.deactivate_btn = QPushButton("Deactivate License")
+        self.deactivate_btn.setFont(QFont("Sans", 9))
+        self.deactivate_btn.setToolTip("Deactivate license on this machine")
+        self.deactivate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(220, 53, 69, 180);
+                color: white;
+                border: none;
+                border-radius: 4px;
+                padding: 4px 8px;
+            }
+            QPushButton:hover {
+                background-color: rgba(200, 35, 51, 210);
+            }
+        """)
+        self.deactivate_btn.clicked.connect(self._deactivate_license)
+        title_layout.addWidget(self.deactivate_btn)
+
         # Focus mode button (shows only answers)
         self.focus_btn = QPushButton("👁 Focus")
         self.focus_btn.setFont(QFont("Sans", 10))
@@ -1573,6 +1598,43 @@ class AstraWindow(QMainWindow):
             total_height = self.content_splitter.height()
             self.content_splitter.setSizes([int(total_height * 0.4), int(total_height * 0.6)])
 
+    def _deactivate_license(self):
+        """Deactivate license and exit app."""
+        reply = QMessageBox.question(
+            self, "Deactivate License",
+            "This will deactivate your license on this machine.\n"
+            "You can then activate it on another machine.\n\n"
+            "Continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+
+        license_key = get_license_key()
+        if not license_key:
+            QMessageBox.warning(self, "No License", "No license key is currently active.")
+            return
+
+        proxy_url = get_proxy_url()
+        hw_id = get_hardware_id()
+        try:
+            base = proxy_url.rsplit("/v1", 1)[0]
+            resp = requests.post(
+                f"{base}/v1/license/deactivate",
+                json={"license_key": license_key, "hardware_id": hw_id},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                clear_license_key()
+                QMessageBox.information(self, "Deactivated", "License deactivated. You can activate on another machine.")
+                sys.exit(0)
+            else:
+                error = resp.json().get("detail", {}).get("error", {})
+                msg = error.get("message", "Deactivation failed.")
+                QMessageBox.warning(self, "Error", msg)
+        except Exception as e:
+            QMessageBox.warning(self, "Error", f"Could not reach server: {e}")
+
     def closeEvent(self, event):
         """Clean up on close."""
         if self.is_listening:
@@ -1594,42 +1656,51 @@ class AstraApp:
         # Thread for background ingestion
         self._ingest_thread = None
 
-        # Check API key on startup
-        if not get_api_key():
-            self._show_api_key_setup()
+        # Check license key on startup
+        if not get_license_key():
+            self._show_license_key_setup()
 
-    def _show_api_key_setup(self):
-        """Show first-run API key setup dialog."""
-        config_path = get_config_path()
+    def _show_license_key_setup(self):
+        """Show license key activation dialog."""
+        from PyQt6.QtWidgets import QInputDialog
 
-        msg = QMessageBox()
-        msg.setIcon(QMessageBox.Icon.Information)
-        msg.setWindowTitle("API Key Setup Required")
-        msg.setText("OpenAI API key not found.")
-        msg.setInformativeText(
-            f"Please create a config file at:\n\n"
-            f"{config_path}\n\n"
-            f"With content:\n"
-            f"OPENAI_API_KEY=sk-your-key-here\n\n"
-            f"Get your API key from:\n"
-            f"https://platform.openai.com/api-keys"
+        key, ok = QInputDialog.getText(
+            None,
+            "License Activation",
+            "Enter your license key:",
         )
-        msg.setStandardButtons(QMessageBox.StandardButton.Ok | QMessageBox.StandardButton.Cancel)
-        msg.setDefaultButton(QMessageBox.StandardButton.Ok)
-
-        result = msg.exec()
-
-        if result == QMessageBox.StandardButton.Cancel:
+        if not ok or not key.strip():
             sys.exit(0)
 
-        # Re-check after user clicks OK
-        if not get_api_key():
-            QMessageBox.warning(
-                None,
-                "API Key Still Missing",
-                f"API key not found at {config_path}\n\n"
-                "Please create the file and restart the application."
+        key = key.strip()
+        # Try to activate with backend
+        proxy_url = get_proxy_url()
+        hw_id = get_hardware_id()
+        try:
+            # Use base URL (strip /v1 suffix for license endpoint)
+            base = proxy_url.rsplit("/v1", 1)[0]
+            resp = requests.post(
+                f"{base}/v1/license/activate",
+                json={"license_key": key, "hardware_id": hw_id},
+                timeout=10,
             )
+            if resp.status_code == 200:
+                save_license_key(key)
+                QMessageBox.information(None, "Activated", "License activated successfully!")
+            else:
+                error = resp.json().get("detail", {}).get("error", {})
+                msg = error.get("message", "Activation failed.")
+                QMessageBox.warning(None, "Activation Failed", msg)
+                sys.exit(1)
+        except requests.ConnectionError:
+            # Allow offline entry -- save the key, validate later
+            save_license_key(key)
+            QMessageBox.information(
+                None, "Key Saved",
+                "Could not reach server. Key saved locally -- will validate when online."
+            )
+        except Exception as e:
+            QMessageBox.warning(None, "Error", f"Activation error: {e}")
             sys.exit(1)
 
     def show(self):
@@ -1735,12 +1806,12 @@ class AstraApp:
 
     def _on_start_session(self):
         """Handle start session request."""
-        # Safety check for API key
-        if not get_api_key():
+        # Safety check for license key
+        if not get_license_key():
             QMessageBox.warning(
                 self.startup_screen,
-                "API Key Missing",
-                f"Please configure your API key at:\n{get_config_path()}"
+                "License Key Missing",
+                "No license key configured. Please activate your license."
             )
             return
 
