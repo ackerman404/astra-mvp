@@ -8,7 +8,25 @@ Usage:
 """
 
 import argparse
+import logging
+import os
 import sys
+
+
+def _setup_crash_log():
+    """Redirect stderr to a log file when running as a frozen PyInstaller exe."""
+    if getattr(sys, 'frozen', False):
+        from platformdirs import user_data_dir
+        log_dir = user_data_dir("astra", ensure_exists=True)
+        log_path = os.path.join(log_dir, "crash.log")
+        logging.basicConfig(
+            filename=log_path,
+            level=logging.DEBUG,
+            format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        )
+        # Also redirect stderr so uncaught exceptions go to the file
+        sys.stderr = open(log_path, "a")
+        logging.info("Astra starting (frozen exe)")
 
 
 def run_ingestion(folder_path: str) -> None:
@@ -19,6 +37,11 @@ def run_ingestion(folder_path: str) -> None:
 
 def launch_gui() -> None:
     """Launch the PyQt6 GUI application with startup screen."""
+    # Pre-load Whisper model in main thread to avoid threading conflicts
+    # with onnxruntime when transcription runs in background threads
+    from transcriber import get_whisper_model
+    get_whisper_model()
+
     from PyQt6.QtWidgets import QApplication
     from gui import AstraApp
 
@@ -32,6 +55,8 @@ def launch_gui() -> None:
 
 
 def main():
+    _setup_crash_log()
+
     parser = argparse.ArgumentParser(
         description="Astra Interview Copilot",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -59,7 +84,11 @@ Examples:
 
     # Launch GUI with startup screen
     print("Starting Astra Interview Copilot...")
-    launch_gui()
+    try:
+        launch_gui()
+    except Exception:
+        logging.exception("Fatal error during startup")
+        raise
 
 
 if __name__ == "__main__":
