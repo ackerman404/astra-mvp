@@ -68,7 +68,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 11-01: TBD
+- [ ] 11-01: License activation screen & first-run flow
 
 ### Phase 12: Windows Installer & Distribution
 **Goal**: Windows installer (.exe) via PyInstaller + Inno Setup, ready for distribution
