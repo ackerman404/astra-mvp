@@ -84,7 +84,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 12-01: TBD
+- [ ] 12-01: Windows installer packaging (checkpoint pending)
 
 ## Progress
 
@@ -96,7 +96,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 | 9. Backend Proxy & License Service | 2/2 | Complete | 2026-02-17 |
 | 10. Desktop App Integration | 2/2 | Complete | 2026-02-17 |
 | 11. License Key UI & First-Run | 1/1 | Complete | 2026-02-17 |
-| 12. Windows Installer & Distribution | 0/TBD | Not started | - |
+| 12. Windows Installer & Distribution | 0/1 | In progress | - |
 
 ---
 

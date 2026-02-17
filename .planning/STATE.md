@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Sub-3-second total response time from silence detection to answer display
-**Current focus:** Phase 11 complete — ready for Phase 12
+**Current focus:** Phase 12 in progress — Windows installer packaging (checkpoint pending)
 
 ## Current Position
 
-Phase: 11 of 12 (License Key UI & First-Run)
+Phase: 12 of 12 (Windows Installer & Distribution)
 Plan: 1 of 1 in current phase
-Status: Phase complete
-Last activity: 2026-02-17 — Completed 11-01-PLAN.md
+Status: In progress (checkpoint: human-verify pending)
+Last activity: 2026-02-17 — Executed 12-01-PLAN.md Tasks 1-2, awaiting checkpoint
 
-Progress: ██████░░░░ 60%
+Progress: ███████████░ 95%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 18
+- Total plans completed: 19
 - Average duration: ~4 min
-- Total execution time: ~66 min
+- Total execution time: ~68 min
 
 **By Phase:**
 
@@ -34,6 +34,7 @@ Progress: ██████░░░░ 60%
 | v3.0 (Phase 9) | 2 | ~6 min | ~3 min |
 | v3.0 (Phase 10) | 2 | ~6 min | ~3 min |
 | v3.0 (Phase 11) | 1 | ~3 min | ~3 min |
+| v3.0 (Phase 12) | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
 - Last 5 plans: all successful, stable ~3-4 min/plan
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 | 10-02 | _get_openai_client() factory in rag.py | Centralizes proxy client creation for all 5 call sites |
 | 11-01 | LicenseActivationScreen replaces QInputDialog | Polished first-run UX with color-coded feedback |
 | 11-01 | "Continue without license" skip option | Users can ingest docs without license, LLM features blocked |
+| 12-01 | --onedir over --onefile bundling | Avoids AV false positives, faster startup (no temp extraction) |
+| 12-01 | UPX disabled | Triggers more AV false positives than size savings justify |
+| 12-01 | Per-user install to {localappdata}\Astra | No admin rights required (PrivilegesRequired=lowest) |
 
 ### Pending Todos
 
@@ -87,9 +91,10 @@ None yet.
 - v3.0 Phase 9 complete: Backend proxy with license keys, SSE streaming, rate limiting, health check
 - v3.0 Phase 10 complete: Desktop app routes all LLM calls through proxy, license key activation/deactivation
 - v3.0 Phase 11 complete: License activation screen with first-run flow, color-coded feedback, purchase link
+- v3.0 Phase 12 in progress: Windows installer packaging (PyInstaller --onedir + Inno Setup), checkpoint pending
 
 ## Session Continuity
 
-Last session: 2026-02-17 01:34 UTC
-Stopped at: Completed 11-01-PLAN.md — Phase 11 complete (1/1 plans)
+Last session: 2026-02-17 21:52 UTC
+Stopped at: 12-01-PLAN.md Task 3 checkpoint (human-verify) — Tasks 1-2 complete
 Resume file: None
