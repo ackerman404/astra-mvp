@@ -203,54 +203,54 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIC-01 | — | Pending |
-| LIC-02 | — | Pending |
-| LIC-03 | — | Pending |
-| LIC-04 | — | Pending |
-| LIC-05 | — | Pending |
-| LIC-06 | — | Pending |
-| LIC-07 | — | Pending |
-| LIC-08 | — | Pending |
-| LIC-09 | — | Pending |
-| PROXY-01 | — | Pending |
-| PROXY-02 | — | Pending |
-| PROXY-03 | — | Pending |
-| PROXY-04 | — | Pending |
-| PROXY-05 | — | Pending |
-| PROXY-06 | — | Pending |
-| PROXY-07 | — | Pending |
-| PROXY-08 | — | Pending |
-| PROXY-09 | — | Pending |
-| APP-01 | — | Pending |
-| APP-02 | — | Pending |
-| APP-03 | — | Pending |
-| FRX-01 | — | Pending |
-| FRX-02 | — | Pending |
-| FRX-03 | — | Pending |
-| FRX-04 | — | Pending |
-| FRX-05 | — | Pending |
-| MGMT-01 | — | Pending |
-| MGMT-02 | — | Pending |
-| MGMT-03 | — | Pending |
-| MGMT-04 | — | Pending |
-| INST-01 | — | Pending |
-| INST-02 | — | Pending |
-| INST-03 | — | Pending |
-| INST-04 | — | Pending |
-| INST-05 | — | Pending |
-| INST-06 | — | Pending |
-| INST-07 | — | Pending |
-| INST-08 | — | Pending |
-| REL-01 | — | Pending |
-| REL-02 | — | Pending |
-| REL-03 | — | Pending |
-| REL-04 | — | Pending |
-| REL-05 | — | Pending |
+| LIC-01 | Phase 11 | Pending |
+| LIC-02 | Phase 9 | Pending |
+| LIC-03 | Phase 11 | Pending |
+| LIC-04 | Phase 10 | Pending |
+| LIC-05 | Phase 9 | Pending |
+| LIC-06 | Phase 9 | Pending |
+| LIC-07 | Phase 10 | Pending |
+| LIC-08 | Phase 9 | Pending |
+| LIC-09 | Phase 10 | Pending |
+| PROXY-01 | Phase 9 | Pending |
+| PROXY-02 | Phase 9 | Pending |
+| PROXY-03 | Phase 9 | Pending |
+| PROXY-04 | Phase 9 | Pending |
+| PROXY-05 | Phase 9 | Pending |
+| PROXY-06 | Phase 9 | Pending |
+| PROXY-07 | Phase 9 | Pending |
+| PROXY-08 | Phase 9 | Pending |
+| PROXY-09 | Phase 9 | Pending |
+| APP-01 | Phase 10 | Pending |
+| APP-02 | Phase 10 | Pending |
+| APP-03 | Phase 10 | Pending |
+| FRX-01 | Phase 11 | Pending |
+| FRX-02 | Phase 11 | Pending |
+| FRX-03 | Phase 11 | Pending |
+| FRX-04 | Phase 11 | Pending |
+| FRX-05 | Phase 11 | Pending |
+| MGMT-01 | Phase 9 | Pending |
+| MGMT-02 | Phase 9 | Pending |
+| MGMT-03 | Phase 9 | Pending |
+| MGMT-04 | Phase 9 | Pending |
+| INST-01 | Phase 12 | Pending |
+| INST-02 | Phase 12 | Pending |
+| INST-03 | Phase 12 | Pending |
+| INST-04 | Phase 12 | Pending |
+| INST-05 | Phase 12 | Pending |
+| INST-06 | Phase 12 | Pending |
+| INST-07 | Phase 12 | Pending |
+| INST-08 | Phase 12 | Pending |
+| REL-01 | Phase 9 | Pending |
+| REL-02 | Phase 9 | Pending |
+| REL-03 | Phase 9 | Pending |
+| REL-04 | Phase 9 | Pending |
+| REL-05 | Phase 9 | Pending |
 
 **v3.0 Coverage:**
 - v3.0 requirements: 43 total
-- Mapped to phases: 0
-- Unmapped: 43 (awaiting roadmap)
+- Mapped to phases: 43
+- Unmapped: 0 ✓
 
 ### v1–v2.2 Traceability (Historical)
 
@@ -292,4 +292,4 @@ Which phases cover which requirements. Updated by create-roadmap.
 
 ---
 *Requirements defined: 2026-01-17*
-*Last updated: 2026-02-16 after v3.0 requirements definition*
+*Last updated: 2026-02-16 after v3.0 roadmap creation*

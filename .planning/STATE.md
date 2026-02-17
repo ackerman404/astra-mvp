@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Sub-3-second total response time from silence detection to answer display
-**Current focus:** v3.0 Online Distribution & License Gating
+**Current focus:** Phase 9 — Backend Proxy & License Service
 
 ## Current Position
 
-Phase: Not started (run /gsd:create-roadmap)
-Plan: —
-Status: Defining requirements
-Last activity: 2026-02-16 — Milestone v3.0 started
+Phase: 9 of 12 (Backend Proxy & License Service)
+Plan: Not started
+Status: Ready to plan
+Last activity: 2026-02-16 — v3.0 roadmap created (4 phases, 43 requirements)
 
 Progress: ░░░░░░░░░░ 0%
 
@@ -27,21 +27,14 @@ Progress: ░░░░░░░░░░ 0%
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| v1.0 01-memory-audio-pipeline | 1 | ~5 min | ~5 min |
-| v1.0 02-transcription-optimization | 1 | ~1 min | ~1 min |
-| v1.0 04-windows-compatibility-setup | 3 | ~6 min | ~2 min |
-| v2.0 01-startup-screen | 1 | ~5 min | ~5 min |
-| v2.0 02-gui-document-ingestion | 1 | ~5 min | ~5 min |
-| v2.0 03-resizable-layout | 1 | ~5 min | ~5 min |
-| v2.0 04-secure-api-key-handling | 1 | ~6 min | ~6 min |
-| v2.1 05-dual-pane-layout | 1 | ~5 min | ~5 min |
-| v2.1 06-answer-formats | 1 | ~5 min | ~5 min |
-| v2.1 07-parallel-generation | 1 | ~3 min | ~3 min |
-| v2.2 08-customizable-prompts | 1 | ~5 min | ~5 min |
+| v1.0 (Phases 1-4) | 5 | ~12 min | ~2.4 min |
+| v2.0 (Phases 1-4) | 4 | ~21 min | ~5.3 min |
+| v2.1 (Phases 5-7) | 3 | ~13 min | ~4.3 min |
+| v2.2 (Phase 8) | 1 | ~5 min | ~5 min |
 
 **Recent Trend:**
-- Last 4 plans: answer-formats, parallel-gen, customizable-prompts (all successful)
-- Trend: Stable - v2.2 milestone complete
+- Last 4 plans: all successful, stable ~5 min/plan
+- Trend: Stable
 
 ## Accumulated Context
 
@@ -51,14 +44,13 @@ Recent decisions affecting current work:
 
 | Phase | Decision | Rationale |
 |-------|----------|-----------|
-| v2.0-03 | QSplitter for panels | User-adjustable divider, reusable for dual-pane |
 | v2.0-04 | platformdirs for config | Cross-platform user config directory |
-| v2.1-05 | answer_box alias to bullet_box | Backward compatibility for existing answer flow |
 | v2.1-06 | gpt-4o-mini for bullets, gpt-4o for script | Speed vs quality tradeoff per format |
-| v2.1-06 | Tone placeholder in script prompt | Dynamic injection without multiple prompts |
 | v2.1-07 | ThreadPoolExecutor for parallel generation | Simpler than asyncio, sync-friendly with OpenAI SDK |
-| v2.2-08 | YAML for prompts config | Multi-line prompts more readable, pyyaml widely available |
-| v2.2-08 | Config cache in rag.py | Avoid repeated file reads during generation |
+| v2.2-08 | YAML for prompts config | Multi-line prompts more readable |
+| v3.0 | Hybrid architecture | Local audio/transcription/RAG + backend LLM proxy |
+| v3.0 | Basic license key deterrent | Not trying to stop determined crackers |
+| v3.0 | RAG stays local | User documents never leave their machine |
 
 ### Pending Todos
 
@@ -74,10 +66,10 @@ None yet.
 - v2.0 complete: Startup screen, GUI ingestion, layout, security
 - v2.1 complete: Dual-pane answers with parallel generation
 - v2.2 complete: Customizable prompts and settings via YAML
-- v3.0 started: Online distribution with backend proxy and license gating
+- v3.0 roadmap created: 4 phases (backend proxy → app integration → license UI → installer)
 
 ## Session Continuity
 
-Last session: 2026-02-16
-Stopped at: v3.0 milestone initialized, needs roadmap
+Last session: 2026-02-16 7:12 PM
+Stopped at: v3.0 roadmap created, ready to plan Phase 9
 Resume file: None
