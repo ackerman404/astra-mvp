@@ -5,23 +5,23 @@
 See: .planning/PROJECT.md (updated 2026-02-16)
 
 **Core value:** Sub-3-second total response time from silence detection to answer display
-**Current focus:** Phase 10 complete — ready for Phase 11
+**Current focus:** Phase 11 complete — ready for Phase 12
 
 ## Current Position
 
-Phase: 10 of 12 (Desktop App Integration)
-Plan: 2 of 2 in current phase
+Phase: 11 of 12 (License Key UI & First-Run)
+Plan: 1 of 1 in current phase
 Status: Phase complete
-Last activity: 2026-02-17 — Completed 10-02-PLAN.md
+Last activity: 2026-02-17 — Completed 11-01-PLAN.md
 
-Progress: █████░░░░░ 50%
+Progress: ██████░░░░ 60%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 17
+- Total plans completed: 18
 - Average duration: ~4 min
-- Total execution time: ~63 min
+- Total execution time: ~66 min
 
 **By Phase:**
 
@@ -33,6 +33,7 @@ Progress: █████░░░░░ 50%
 | v2.2 (Phase 8) | 1 | ~5 min | ~5 min |
 | v3.0 (Phase 9) | 2 | ~6 min | ~3 min |
 | v3.0 (Phase 10) | 2 | ~6 min | ~3 min |
+| v3.0 (Phase 11) | 1 | ~3 min | ~3 min |
 
 **Recent Trend:**
 - Last 5 plans: all successful, stable ~3-4 min/plan
@@ -65,6 +66,8 @@ Recent decisions affecting current work:
 | 10-02 | requests library for license HTTP calls | Simpler API than urllib.request for activation/deactivation |
 | 10-02 | Offline license entry allowed | Key saved locally, validates when server is reachable |
 | 10-02 | _get_openai_client() factory in rag.py | Centralizes proxy client creation for all 5 call sites |
+| 11-01 | LicenseActivationScreen replaces QInputDialog | Polished first-run UX with color-coded feedback |
+| 11-01 | "Continue without license" skip option | Users can ingest docs without license, LLM features blocked |
 
 ### Pending Todos
 
@@ -83,9 +86,10 @@ None yet.
 - v3.0 roadmap created: 4 phases (backend proxy -> app integration -> license UI -> installer)
 - v3.0 Phase 9 complete: Backend proxy with license keys, SSE streaming, rate limiting, health check
 - v3.0 Phase 10 complete: Desktop app routes all LLM calls through proxy, license key activation/deactivation
+- v3.0 Phase 11 complete: License activation screen with first-run flow, color-coded feedback, purchase link
 
 ## Session Continuity
 
 Last session: 2026-02-17 01:34 UTC
-Stopped at: Completed 10-02-PLAN.md — Phase 10 complete (2/2 plans)
+Stopped at: Completed 11-01-PLAN.md — Phase 11 complete (1/1 plans)
 Resume file: None
