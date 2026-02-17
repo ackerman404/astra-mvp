@@ -13,7 +13,7 @@ import chromadb
 from openai import OpenAI
 import json
 
-from config import get_api_key, load_prompts_config
+from config import get_license_key, get_proxy_url, load_prompts_config
 
 # Cross-platform path for ChromaDB
 CHROMA_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
@@ -30,6 +30,15 @@ SPARSE_WEIGHT = 0.5  # Weight for sparse (BM25) results in fusion
 
 # Config cache
 _prompts_config = None
+
+
+def _get_openai_client() -> OpenAI:
+    """Create OpenAI client routed through the backend proxy."""
+    license_key = get_license_key()
+    if not license_key:
+        raise RuntimeError("License key not configured. Please activate your license in the app.")
+    proxy_url = get_proxy_url()
+    return OpenAI(api_key=license_key, base_url=proxy_url)
 
 # BM25 index cache
 _bm25_index = None
@@ -165,11 +174,7 @@ def _search_dense(query: str, top_k: int = 20) -> list[dict]:
     if collection.count() == 0:
         return []
 
-    api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("OpenAI API key not configured.")
-
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = _get_openai_client()
 
     # Embed the query
     response = openai_client.embeddings.create(
@@ -428,10 +433,7 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
             "cleaned_question": text
         }
 
-    api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = _get_openai_client()
 
     try:
         response = openai_client.chat.completions.create(
@@ -717,10 +719,7 @@ def generate_star_response(question: str, context_chunks: list[dict], job_contex
     Generate a SAP interview response using retrieved context.
     Falls back to general SAP knowledge if context is not relevant.
     """
-    api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = _get_openai_client()
 
     # Check if we have relevant context
     has_relevant_context = (
@@ -786,10 +785,7 @@ def generate_bullet_response(question: str, context_chunks: list[dict], job_cont
     Generate a concise 2-3 bullet point response using retrieved context.
     Uses gpt-4o-mini for speed since bullets are simple.
     """
-    api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = _get_openai_client()
 
     # Check if we have relevant context
     has_relevant_context = (
@@ -855,10 +851,7 @@ def generate_script_response(question: str, context_chunks: list[dict], job_cont
     Generate a humanized, speakable interview script using retrieved context.
     Uses gpt-4o for quality since natural speech requires sophistication.
     """
-    api_key = get_api_key()
-    if not api_key:
-        raise RuntimeError("OpenAI API key not configured. Run the GUI for setup instructions.")
-    openai_client = OpenAI(api_key=api_key)
+    openai_client = _get_openai_client()
 
     # Get tone instruction from config
     tone_instruction = get_tone_instruction(tone)

@@ -15,7 +15,7 @@ import chromadb
 import pdfplumber
 from openai import OpenAI
 
-from config import get_api_key
+from config import get_license_key, get_proxy_url
 
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
@@ -233,14 +233,15 @@ def ingest_folder_with_progress(
     if not progress_callback:
         print(f"Found {total_files} file(s) to process.")
 
-    # Initialize OpenAI client
-    api_key = get_api_key()
-    if not api_key:
-        msg = "OpenAI API key not configured. See ~/.config/astra/.env"
+    # Initialize OpenAI client (routed through backend proxy)
+    license_key = get_license_key()
+    if not license_key:
+        msg = "License key not configured. Activate your license in the app."
         report("error", message=msg, total_files=total_files, current_file_index=0,
                current_file_name="", current_file_chunks=0, total_chunks=0)
         return {"success": False, "total_files": total_files, "total_chunks": 0, "errors": [msg]}
-    openai_client = OpenAI(api_key=api_key)
+    proxy_url = get_proxy_url()
+    openai_client = OpenAI(api_key=license_key, base_url=proxy_url)
 
     # Initialize ChromaDB
     chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
