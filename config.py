@@ -4,12 +4,17 @@ Astra Interview Copilot - Configuration
 
 Configuration constants and default values.
 Audio device management moved to audio_capture.py.
-API key management with cross-platform user config directory.
+License key, proxy URL, and hardware ID management with cross-platform user config directory.
 """
 
-from platformdirs import user_config_dir
+import hashlib
+import platform
+import subprocess
+from functools import lru_cache
 from pathlib import Path
+
 import yaml
+from platformdirs import user_config_dir
 
 
 def get_config_dir() -> Path:
@@ -19,9 +24,51 @@ def get_config_dir() -> Path:
     return config_dir
 
 
-def get_api_key() -> str | None:
+# ---------------------------------------------------------------------------
+# .env file helpers (KEY=value format)
+# ---------------------------------------------------------------------------
+
+
+def _read_env_file() -> dict[str, str]:
+    """Read all key-value pairs from the .env config file."""
+    config_file = get_config_dir() / ".env"
+    data: dict[str, str] = {}
+
+    if not config_file.exists():
+        return data
+
+    with open(config_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            if "=" in line:
+                key, value = line.split("=", 1)
+                data[key.strip()] = value.strip().strip('"').strip("'")
+
+    return data
+
+
+def _write_env_file(data: dict[str, str]) -> bool:
+    """Write key-value pairs to the .env config file."""
+    config_file = get_config_dir() / ".env"
+    try:
+        with open(config_file, "w", encoding="utf-8") as f:
+            for key, value in data.items():
+                f.write(f"{key}={value}\n")
+        return True
+    except IOError:
+        return False
+
+
+# ---------------------------------------------------------------------------
+# License key management
+# ---------------------------------------------------------------------------
+
+
+def get_license_key() -> str | None:
     """
-    Load OpenAI API key from user config directory.
+    Load license key from user config directory.
 
     Config location:
     - Linux: ~/.config/astra/.env
@@ -30,25 +77,94 @@ def get_api_key() -> str | None:
 
     Returns None if not found.
     """
-    config_file = get_config_dir() / ".env"
+    data = _read_env_file()
+    return data.get("LICENSE_KEY") or None
 
-    if not config_file.exists():
-        return None
 
-    # Parse simple KEY=value format
-    with open(config_file, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line.startswith("OPENAI_API_KEY="):
-                # Handle quoted values
-                value = line.split("=", 1)[1]
-                return value.strip('"').strip("'")
+def save_license_key(key: str) -> bool:
+    """Write LICENSE_KEY to the .env file, preserving other entries."""
+    data = _read_env_file()
+    data["LICENSE_KEY"] = key
+    return _write_env_file(data)
 
-    return None
+
+def clear_license_key() -> bool:
+    """Remove the LICENSE_KEY line from the .env file."""
+    data = _read_env_file()
+    data.pop("LICENSE_KEY", None)
+    return _write_env_file(data)
+
+
+# ---------------------------------------------------------------------------
+# Proxy URL management
+# ---------------------------------------------------------------------------
+
+_DEFAULT_PROXY_URL = "https://astra-proxy.up.railway.app/v1"
+
+
+def get_proxy_url() -> str:
+    """
+    Read PROXY_URL from the .env file.
+
+    Returns the configured URL or the production default if not set.
+    For local dev, set PROXY_URL=http://localhost:8000/v1 in the .env file.
+    """
+    data = _read_env_file()
+    return data.get("PROXY_URL") or _DEFAULT_PROXY_URL
+
+
+def save_proxy_url(url: str) -> bool:
+    """Write PROXY_URL to the .env file, preserving other entries."""
+    data = _read_env_file()
+    data["PROXY_URL"] = url
+    return _write_env_file(data)
+
+
+# ---------------------------------------------------------------------------
+# Hardware ID
+# ---------------------------------------------------------------------------
+
+
+@lru_cache(maxsize=1)
+def get_hardware_id() -> str:
+    """
+    Generate a stable machine identifier (32-char hex string).
+
+    Strategy:
+    - Linux: SHA-256 hash of /etc/machine-id
+    - Windows: SHA-256 hash of wmic csproduct UUID
+    - Fallback: SHA-256 hash of MAC address via uuid.getnode()
+
+    Cached per process (computed once).
+    """
+    system = platform.system()
+
+    try:
+        if system == "Linux":
+            machine_id_path = Path("/etc/machine-id")
+            if machine_id_path.exists():
+                raw = machine_id_path.read_text().strip()
+                return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+        elif system == "Windows":
+            result = subprocess.run(
+                ["wmic", "csproduct", "get", "uuid"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.strip().splitlines():
+                line = line.strip()
+                if line and line.upper() != "UUID":
+                    return hashlib.sha256(line.encode()).hexdigest()[:32]
+    except Exception:
+        pass
+
+    # Fallback: MAC address
+    import uuid
+    return hashlib.sha256(str(uuid.getnode()).encode()).hexdigest()[:32]
 
 
 def get_config_path() -> Path:
-    """Get path to config file for display to user."""
+    """Get path to .env config file for display to user (license key, proxy URL)."""
     return get_config_dir() / ".env"
 
 
