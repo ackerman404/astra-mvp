@@ -28,8 +28,8 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QSizePolicy,
 )
-from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer
-from PyQt6.QtGui import QFont, QTextCursor
+from PyQt6.QtCore import Qt, pyqtSignal, QObject, QTimer, QUrl
+from PyQt6.QtGui import QFont, QTextCursor, QDesktopServices
 
 from transcriber import transcribe_audio
 from audio_capture import get_audio_capture
@@ -285,6 +285,165 @@ class StartupScreen(QWidget):
         else:
             self.progress_bar.setRange(0, 100)
             self.progress_bar.setValue(0)
+
+
+class LicenseActivationScreen(QWidget):
+    """Styled license activation screen with color-coded feedback."""
+
+    activated = pyqtSignal()
+    skipped = pyqtSignal()
+
+    def __init__(self):
+        super().__init__()
+        self._init_ui()
+
+    def _init_ui(self):
+        """Set up the activation screen UI."""
+        self.setWindowTitle("Astra - License Activation")
+        self.setMinimumSize(400, 450)
+        self.resize(400, 450)
+        self.setStyleSheet("background-color: #ffffff;")
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(15)
+        layout.setContentsMargins(40, 40, 40, 40)
+
+        # Title
+        title = QLabel("Astra Interview Copilot")
+        title.setFont(QFont("Sans", 18, QFont.Weight.Bold))
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("color: #222222;")
+        layout.addWidget(title)
+
+        # Subtitle
+        subtitle = QLabel("License Activation")
+        subtitle.setFont(QFont("Sans", 12))
+        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        subtitle.setStyleSheet("color: #666666;")
+        layout.addWidget(subtitle)
+
+        layout.addStretch()
+
+        # License key input
+        self.key_input = QLineEdit()
+        self.key_input.setPlaceholderText("Enter your license key")
+        self.key_input.setFont(QFont("Sans", 14))
+        self.key_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.key_input.setMinimumHeight(45)
+        self.key_input.setStyleSheet("""
+            QLineEdit {
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                padding: 8px 12px;
+                background-color: #ffffff;
+                color: #222222;
+            }
+            QLineEdit:focus {
+                border-color: #4a90d9;
+            }
+        """)
+        layout.addWidget(self.key_input)
+
+        # Status label (hidden initially)
+        self.status_label = QLabel("")
+        self.status_label.setFont(QFont("Sans", 12))
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.status_label.setWordWrap(True)
+        self.status_label.setVisible(False)
+        layout.addWidget(self.status_label)
+
+        # Activate button
+        self.activate_btn = QPushButton("Activate")
+        self.activate_btn.setFont(QFont("Sans", 12))
+        self.activate_btn.setMinimumHeight(50)
+        self.activate_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #4a90d9;
+                color: white;
+                border: none;
+                border-radius: 8px;
+            }
+            QPushButton:hover {
+                background-color: #3a7bc8;
+            }
+            QPushButton:disabled {
+                background-color: #cccccc;
+            }
+        """)
+        self.activate_btn.clicked.connect(self._on_activate)
+        layout.addWidget(self.activate_btn)
+
+        layout.addStretch()
+
+        # Purchase link
+        purchase_link = QLabel('<a href="#" style="color: #4a90d9;">Where do I get a license key?</a>')
+        purchase_link.setFont(QFont("Sans", 10))
+        purchase_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        purchase_link.linkActivated.connect(
+            lambda: QDesktopServices.openUrl(QUrl("https://astra-copilot.com"))
+        )
+        layout.addWidget(purchase_link)
+
+        # Continue without license link
+        skip_link = QLabel('<a href="#" style="color: #999999;">Continue without license</a>')
+        skip_link.setFont(QFont("Sans", 9))
+        skip_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        skip_link.linkActivated.connect(self._on_skip)
+        layout.addWidget(skip_link)
+
+    def _set_status(self, msg: str, color_type: str):
+        """Set status label with color-coded feedback."""
+        styles = {
+            "success": "background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb;",
+            "error": "background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb;",
+            "warning": "background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba;",
+            "info": "background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db;",
+        }
+        style = styles.get(color_type, styles["info"])
+        self.status_label.setStyleSheet(f"QLabel {{ {style} border-radius: 6px; padding: 8px 12px; }}")
+        self.status_label.setText(msg)
+        self.status_label.setVisible(True)
+
+    def _on_activate(self):
+        """Handle activate button click."""
+        self.activate_btn.setEnabled(False)
+        self._set_status("Activating...", "info")
+
+        key = self.key_input.text().strip()
+        if not key:
+            self._set_status("Please enter a license key", "error")
+            self.activate_btn.setEnabled(True)
+            return
+
+        proxy_url = get_proxy_url()
+        hw_id = get_hardware_id()
+        try:
+            base = proxy_url.rsplit("/v1", 1)[0]
+            resp = requests.post(
+                f"{base}/v1/license/activate",
+                json={"license_key": key, "hardware_id": hw_id},
+                timeout=10,
+            )
+            if resp.status_code == 200:
+                save_license_key(key)
+                self._set_status("License activated successfully!", "success")
+                QTimer.singleShot(500, self.activated.emit)
+            else:
+                error = resp.json().get("detail", {}).get("error", {})
+                msg = error.get("message", "Activation failed.")
+                self._set_status(msg, "error")
+                self.activate_btn.setEnabled(True)
+        except requests.ConnectionError:
+            save_license_key(key)
+            self._set_status("Key saved — will validate when online", "warning")
+            QTimer.singleShot(1000, self.activated.emit)
+        except Exception as e:
+            self._set_status(f"Error: {e}", "error")
+            self.activate_btn.setEnabled(True)
+
+    def _on_skip(self):
+        """Handle continue without license."""
+        self.skipped.emit()
 
 
 class AstraWindow(QMainWindow):
@@ -1647,65 +1806,36 @@ class AstraApp:
 
     def __init__(self):
         self.startup_screen = StartupScreen()
+        self.activation_screen = LicenseActivationScreen()
         self.session_window = None  # Lazy create
 
         # Connect startup screen signals
         self.startup_screen.ingest_requested.connect(self._on_ingest)
         self.startup_screen.start_session_requested.connect(self._on_start_session)
 
+        # Connect activation screen signals
+        self.activation_screen.activated.connect(self._on_license_activated)
+        self.activation_screen.skipped.connect(self._on_license_skipped)
+
         # Thread for background ingestion
         self._ingest_thread = None
 
-        # Check license key on startup
-        if not get_license_key():
-            self._show_license_key_setup()
+    def _on_license_activated(self):
+        """Handle successful license activation."""
+        self.activation_screen.hide()
+        self.startup_screen.show()
 
-    def _show_license_key_setup(self):
-        """Show license key activation dialog."""
-        from PyQt6.QtWidgets import QInputDialog
-
-        key, ok = QInputDialog.getText(
-            None,
-            "License Activation",
-            "Enter your license key:",
-        )
-        if not ok or not key.strip():
-            sys.exit(0)
-
-        key = key.strip()
-        # Try to activate with backend
-        proxy_url = get_proxy_url()
-        hw_id = get_hardware_id()
-        try:
-            # Use base URL (strip /v1 suffix for license endpoint)
-            base = proxy_url.rsplit("/v1", 1)[0]
-            resp = requests.post(
-                f"{base}/v1/license/activate",
-                json={"license_key": key, "hardware_id": hw_id},
-                timeout=10,
-            )
-            if resp.status_code == 200:
-                save_license_key(key)
-                QMessageBox.information(None, "Activated", "License activated successfully!")
-            else:
-                error = resp.json().get("detail", {}).get("error", {})
-                msg = error.get("message", "Activation failed.")
-                QMessageBox.warning(None, "Activation Failed", msg)
-                sys.exit(1)
-        except requests.ConnectionError:
-            # Allow offline entry -- save the key, validate later
-            save_license_key(key)
-            QMessageBox.information(
-                None, "Key Saved",
-                "Could not reach server. Key saved locally -- will validate when online."
-            )
-        except Exception as e:
-            QMessageBox.warning(None, "Error", f"Activation error: {e}")
-            sys.exit(1)
+    def _on_license_skipped(self):
+        """Handle continue without license."""
+        self.activation_screen.hide()
+        self.startup_screen.show()
 
     def show(self):
-        """Show the startup screen."""
-        self.startup_screen.show()
+        """Show the appropriate screen based on license state."""
+        if get_license_key():
+            self.startup_screen.show()
+        else:
+            self.activation_screen.show()
 
     def _on_ingest(self):
         """Handle document ingestion request."""
@@ -1806,13 +1936,16 @@ class AstraApp:
 
     def _on_start_session(self):
         """Handle start session request."""
-        # Safety check for license key
+        # Check license key -- show activation screen if missing
         if not get_license_key():
-            QMessageBox.warning(
-                self.startup_screen,
-                "License Key Missing",
-                "No license key configured. Please activate your license."
-            )
+            self.startup_screen.hide()
+            # Re-connect activated signal to proceed to session after activation
+            try:
+                self.activation_screen.activated.disconnect()
+            except TypeError:
+                pass
+            self.activation_screen.activated.connect(self._on_license_activated_start_session)
+            self.activation_screen.show()
             return
 
         # Create session window if not exists
@@ -1821,6 +1954,22 @@ class AstraApp:
 
         # Hide startup, show session
         self.startup_screen.hide()
+        self.session_window.show()
+
+    def _on_license_activated_start_session(self):
+        """Handle activation from start session flow -- go directly to session."""
+        self.activation_screen.hide()
+        # Restore default activated signal connection
+        try:
+            self.activation_screen.activated.disconnect()
+        except TypeError:
+            pass
+        self.activation_screen.activated.connect(self._on_license_activated)
+
+        # Create session window if not exists
+        if self.session_window is None:
+            self.session_window = AstraWindow()
+
         self.session_window.show()
 
 
