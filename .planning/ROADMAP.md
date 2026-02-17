@@ -52,7 +52,8 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 10-01: TBD
+- [x] 10-01: Embeddings proxy & desktop license config
+- [ ] 10-02: Route LLM/embedding calls through proxy
 
 ### Phase 11: License Key UI & First-Run Experience
 **Goal**: First-launch license activation screen with clear feedback, replacing the existing API key entry flow
@@ -93,7 +94,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 9. Backend Proxy & License Service | 2/2 | Complete | 2026-02-17 |
-| 10. Desktop App Integration | 0/TBD | Not started | - |
+| 10. Desktop App Integration | 1/2 | In progress | - |
 | 11. License Key UI & First-Run | 0/TBD | Not started | - |
 | 12. Windows Installer & Distribution | 0/TBD | Not started | - |
 

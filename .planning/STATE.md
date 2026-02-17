@@ -9,19 +9,19 @@ See: .planning/PROJECT.md (updated 2026-02-16)
 
 ## Current Position
 
-Phase: 9 of 12 (Backend Proxy & License Service)
-Plan: 2 of 2 in current phase
-Status: Phase complete
-Last activity: 2026-02-17 — Completed 09-02-PLAN.md
+Phase: 10 of 12 (Desktop App Integration)
+Plan: 1 of 2 in current phase
+Status: In progress
+Last activity: 2026-02-17 — Completed 10-01-PLAN.md
 
-Progress: ██░░░░░░░░ 16%
+Progress: ████░░░░░░ 37%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 15
+- Total plans completed: 16
 - Average duration: ~4 min
-- Total execution time: ~57 min
+- Total execution time: ~59 min
 
 **By Phase:**
 
@@ -32,6 +32,7 @@ Progress: ██░░░░░░░░ 16%
 | v2.1 (Phases 5-7) | 3 | ~13 min | ~4.3 min |
 | v2.2 (Phase 8) | 1 | ~5 min | ~5 min |
 | v3.0 (Phase 9) | 2 | ~6 min | ~3 min |
+| v3.0 (Phase 10) | 1 | ~2 min | ~2 min |
 
 **Recent Trend:**
 - Last 5 plans: all successful, stable ~3-4 min/plan
@@ -58,6 +59,9 @@ Recent decisions affecting current work:
 | 09-02 | Pass-through JSON body to OpenAI SDK | No Pydantic model for proxy request — avoids schema maintenance |
 | 09-02 | In-memory rate limiting over Redis | Solo dev, no multi-instance deployment needed |
 | 09-02 | Fail-fast on missing/invalid OPENAI_API_KEY | Server refuses to start — prevents silent failures |
+| 10-01 | Production proxy default URL in config.py | https://astra-proxy.up.railway.app/v1 — user can override for local dev |
+| 10-01 | SHA-256 of /etc/machine-id for hardware ID | Stable, cross-platform, 32-char hex with Windows/fallback strategies |
+| 10-01 | _read_env_file/_write_env_file helpers | DRY .env parsing avoids duplicating logic across get/save functions |
 
 ### Pending Todos
 
@@ -78,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-02-17 01:04 UTC
-Stopped at: Completed 09-02-PLAN.md — Phase 9 complete
+Last session: 2026-02-17 01:28 UTC
+Stopped at: Completed 10-01-PLAN.md — 1/2 plans done in Phase 10
 Resume file: None
