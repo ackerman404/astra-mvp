@@ -1,22 +1,37 @@
 @echo off
 setlocal enabledelayedexpansion
 
+REM Change to the directory where this script is located
+cd /d "%~dp0"
+
 echo === Building Astra Windows Executable ===
 echo.
 
+REM Create venv if it doesn't exist
+if not exist venv\Scripts\activate.bat (
+    echo Virtual environment not found. Creating...
+    python -m venv venv
+    if errorlevel 1 (
+        echo ERROR: Failed to create virtual environment.
+        echo Make sure Python 3.10-3.12 is installed, or run setup_windows.bat first.
+        pause
+        exit /b 1
+    )
+)
+
 REM Activate venv
-call venv\Scripts\activate
+call venv\Scripts\activate.bat
 if errorlevel 1 (
     echo ERROR: Failed to activate virtual environment.
-    echo Make sure venv exists: python -m venv venv
     pause
     exit /b 1
 )
 
-REM Install PyInstaller if needed
-pip install pyinstaller
+REM Install dependencies and PyInstaller
+echo Installing dependencies...
+pip install -r requirements.txt pyinstaller
 if errorlevel 1 (
-    echo ERROR: Failed to install PyInstaller.
+    echo ERROR: Failed to install dependencies.
     pause
     exit /b 1
 )
