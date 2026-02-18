@@ -8,9 +8,12 @@ import sys
 block_cipher = None
 
 # Collect data files for bundled packages
-from PyInstaller.utils.hooks import collect_data_files
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 datas = []
+
+# Bundle the pre-downloaded Whisper model (avoids huggingface_hub at runtime)
+datas += [('whisper_model', 'whisper_model')]
 
 # Collect faster-whisper assets (ONNX models, etc.)
 datas += collect_data_files('faster_whisper')
@@ -18,8 +21,12 @@ datas += collect_data_files('faster_whisper')
 # Collect chromadb data files (ONNX models, migration files)
 datas += collect_data_files('chromadb')
 
-# Hidden imports for PyQt6 and all v3.0 dependencies
-hiddenimports = [
+# chromadb uses pkgutil.iter_modules() to discover embedding functions at runtime,
+# which fails in frozen apps — collect all submodules so they're available.
+hiddenimports = collect_submodules('chromadb')
+
+# Additional hidden imports for PyQt6 and all v3.0 dependencies
+hiddenimports += [
     # GUI framework
     'PyQt6.QtCore',
     'PyQt6.QtGui',
@@ -40,8 +47,16 @@ hiddenimports = [
     'yaml',
     # Hybrid search (sparse retrieval)
     'rank_bm25',
-    # Local audio capture module (dynamically imported)
+    # Local modules (imported inside function bodies, PyInstaller misses them)
+    'transcriber',
+    'gui',
+    'ingest',
+    'rag',
+    'config',
     'audio_capture',
+    # Transcription engine
+    'faster_whisper',
+    'ctranslate2',
     # Environment variable loading
     'dotenv',
     # Crypto (explicit inclusion for some builds)
@@ -55,7 +70,7 @@ if sys.platform == 'win32':
 
 a = Analysis(
     ['main.py'],
-    pathex=[],
+    pathex=['.'],
     binaries=[],
     datas=datas,
     hiddenimports=hiddenimports,
@@ -82,7 +97,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=False,  # UPX disabled — triggers more AV false positives than it saves
-    console=False,  # No console window for GUI app
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

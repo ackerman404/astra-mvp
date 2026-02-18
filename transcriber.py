@@ -6,6 +6,30 @@ Uses platform-agnostic AudioCapture abstraction and transcribes
 using faster-whisper.
 """
 
+import os
+import sys
+
+# CTranslate2 + PyInstaller fix: ctranslate2's __init__.py uses
+# importlib.resources.files() to find its DLLs and pre-load them with
+# ctypes.CDLL(). In a frozen exe this path resolves incorrectly, so the
+# DLLs (especially libiomp5md.dll / Intel OpenMP) are never pre-loaded.
+# When CTranslate2 later tries to use OpenMP during model init, Windows
+# can't find libiomp5md.dll via standard LoadLibrary() and segfaults.
+# Fix: explicitly pre-load the DLLs ourselves before importing ctranslate2.
+if getattr(sys, 'frozen', False) and sys.platform == 'win32':
+    import ctypes
+    import glob
+    os.environ.setdefault('OMP_NUM_THREADS', '1')
+    os.environ.setdefault('KMP_DUPLICATE_LIB_OK', 'TRUE')
+    _ct2_dir = os.path.join(sys._MEIPASS, 'ctranslate2')
+    if os.path.isdir(_ct2_dir):
+        os.add_dll_directory(_ct2_dir)
+        for _dll in glob.glob(os.path.join(_ct2_dir, '*.dll')):
+            try:
+                ctypes.CDLL(_dll)
+            except OSError:
+                pass
+
 import numpy as np
 from faster_whisper import WhisperModel
 
@@ -26,13 +50,31 @@ def get_whisper_model() -> WhisperModel:
     """Get or initialize the Whisper model."""
     global _whisper_model
     if _whisper_model is None:
-        print(f"Loading Whisper model '{WHISPER_MODEL}'...")
-        _whisper_model = WhisperModel(
-            WHISPER_MODEL,
-            device=WHISPER_DEVICE,
-            compute_type=WHISPER_COMPUTE_TYPE
-        )
-        print("Model loaded.")
+        print(f"Loading Whisper model '{WHISPER_MODEL}'...", flush=True)
+
+        frozen = getattr(sys, 'frozen', False)
+
+        if frozen:
+            # Frozen exe: load model bundled alongside the executable.
+            # This bypasses huggingface_hub entirely — no network needed.
+            model_path = os.path.join(sys._MEIPASS, 'whisper_model')
+            _whisper_model = WhisperModel(
+                model_path,
+                device=WHISPER_DEVICE,
+                compute_type=WHISPER_COMPUTE_TYPE,
+                cpu_threads=1,
+                num_workers=1,
+            )
+        else:
+            # Dev: download to user cache (or use existing cache)
+            from platformdirs import user_cache_dir
+            _whisper_model = WhisperModel(
+                WHISPER_MODEL,
+                device=WHISPER_DEVICE,
+                compute_type=WHISPER_COMPUTE_TYPE,
+                download_root=user_cache_dir("astra"),
+            )
+        print("Model loaded.", flush=True)
     return _whisper_model
 
 

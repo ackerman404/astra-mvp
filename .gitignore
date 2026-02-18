@@ -27,5 +27,13 @@ documents/*
 .idea/
 *.swp
 
+# PyInstaller build artifacts
+build/
+dist/
+*.spec.bak
+whisper_model/
+build_log.txt
+build_final_log.txt
+
 # Temp files
 =*

@@ -37,11 +37,26 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM --- Step 3: Build app with PyInstaller ---
+REM --- Step 3: Download Whisper model if not already cached ---
+
+if not exist whisper_model\model.bin (
+    echo.
+    echo Downloading Whisper model ^(tiny.en^)...
+    python -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-tiny.en', local_dir='whisper_model')"
+    if errorlevel 1 (
+        echo ERROR: Failed to download Whisper model.
+        pause
+        exit /b 1
+    )
+) else (
+    echo Whisper model already downloaded, skipping.
+)
+
+REM --- Step 4: Build app with PyInstaller ---
 
 echo.
 echo Building app files with PyInstaller...
-pyinstaller astra.spec --clean
+pyinstaller astra.spec --clean -y
 if errorlevel 1 (
     echo ERROR: PyInstaller build failed.
     pause
@@ -49,7 +64,7 @@ if errorlevel 1 (
 )
 echo PyInstaller complete: dist\Astra\
 
-REM --- Step 4: Install Inno Setup if needed ---
+REM --- Step 5: Install Inno Setup if needed ---
 
 set "ISCC="
 
@@ -98,7 +113,7 @@ if exist "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe" (
     exit /b 1
 )
 
-REM --- Step 5: Build installer ---
+REM --- Step 6: Build installer ---
 
 :build_installer
 echo.
