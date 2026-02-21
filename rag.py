@@ -78,7 +78,10 @@ def _load_bm25_index():
         return None, None, None, None
 
     try:
-        chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        chroma_client = chromadb.PersistentClient(
+            path=CHROMA_DB_PATH,
+            settings=chromadb.Settings(anonymized_telemetry=False),
+        )
         collection = chroma_client.get_collection(name=COLLECTION_NAME)
     except Exception:
         return None, None, None, None
@@ -166,7 +169,10 @@ def _search_dense(query: str, top_k: int = 20) -> list[dict]:
         return []
 
     try:
-        chroma_client = chromadb.PersistentClient(path=CHROMA_DB_PATH)
+        chroma_client = chromadb.PersistentClient(
+            path=CHROMA_DB_PATH,
+            settings=chromadb.Settings(anonymized_telemetry=False),
+        )
         collection = chroma_client.get_collection(name=COLLECTION_NAME)
     except Exception:
         return []

@@ -3,6 +3,7 @@ faster-whisper>=1.0.0,<1.1.0
 ctranslate2>=4.0.0,<4.6.0  # 4.6+ segfaults in PyInstaller frozen exe on Windows
 onnxruntime>=1.14.0,<1.20.0  # 1.20+ may have DLL issues on Windows
 chromadb>=0.5.0,<1.0.0  # 1.x has breaking changes
+posthog>=2.4.0,<6.0.0  # 6.0+ changed capture() signature, incompatible with chromadb 0.6.x telemetry
 openai>=1.0.0
 python-dotenv>=1.0.0
 PyQt6>=6.5.0
