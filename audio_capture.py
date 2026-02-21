@@ -593,18 +593,15 @@ class WindowsAudioCapture(AudioCapture):
         bytes_needed = self._target_sample_rate * n * BYTES_PER_SAMPLE
 
         with self._lock:
-            buffer_list = list(self._buffer)
+            buf_len = len(self._buffer)
+            if buf_len == 0:
+                return np.array([], dtype=np.int16)
+            # Snapshot only what we need — avoids copying entire 60s buffer
+            take = min(buf_len, bytes_needed)
+            # deque supports efficient iteration from right via reversed()
+            snapshot = bytes(list(self._buffer)[-take:]) if take < buf_len else bytes(self._buffer)
 
-        # Get last N seconds
-        if len(buffer_list) > bytes_needed:
-            audio_bytes = bytes(buffer_list[-bytes_needed:])
-        else:
-            audio_bytes = bytes(buffer_list)
-
-        if not audio_bytes:
-            return np.array([], dtype=np.int16)
-
-        return np.frombuffer(audio_bytes, dtype=np.int16)
+        return np.frombuffer(snapshot, dtype=np.int16)
 
     def get_audio_level(self) -> float:
         """
@@ -617,12 +614,11 @@ class WindowsAudioCapture(AudioCapture):
         bytes_needed = int(self._target_sample_rate * 0.1 * BYTES_PER_SAMPLE)
 
         with self._lock:
-            buffer_list = list(self._buffer)
+            buf_len = len(self._buffer)
+            if buf_len < bytes_needed:
+                return 0.0
+            audio_bytes = bytes(list(self._buffer)[-bytes_needed:])
 
-        if len(buffer_list) < bytes_needed:
-            return 0.0
-
-        audio_bytes = bytes(buffer_list[-bytes_needed:])
         samples = np.frombuffer(audio_bytes, dtype=np.int16)
 
         if len(samples) == 0:

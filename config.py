@@ -99,7 +99,7 @@ def clear_license_key() -> bool:
 # Proxy URL management
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PROXY_URL = "https://astra-proxy.up.railway.app/v1"
+_DEFAULT_PROXY_URL = "https://backend-production-1dff.up.railway.app/v1"
 
 
 def get_proxy_url() -> str:
@@ -327,7 +327,7 @@ AUDIO_SAMPLE_RATE = 16000  # Whisper expects 16kHz
 AUDIO_CHANNELS = 1  # Mono
 
 # Whisper Configuration
-WHISPER_MODEL = "tiny.en"
+WHISPER_MODEL = "base.en"
 WHISPER_DEVICE = "cpu"
 WHISPER_COMPUTE_TYPE = "int8"
 

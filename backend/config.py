@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     RATE_LIMIT_CLASSIFICATIONS_RPM: int = 60
     OPENAI_TIMEOUT_GENERATE: float = 60.0
     OPENAI_TIMEOUT_CLASSIFY: float = 30.0
+    ADMIN_SECRET: str = ""  # Set to protect /v1/admin/* endpoints
 
 
 settings = Settings()

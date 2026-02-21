@@ -25,6 +25,32 @@ datas += collect_data_files('chromadb')
 # which fails in frozen apps — collect all submodules so they're available.
 hiddenimports = collect_submodules('chromadb')
 
+# Many chromadb subpackages lack __init__.py — collect_submodules misses them.
+# Explicitly list all runtime modules in dirs without __init__.py.
+hiddenimports += [
+    'chromadb.api.models.AsyncCollection',
+    'chromadb.api.models.Collection',
+    'chromadb.api.models.CollectionCommon',
+    'chromadb.db.impl.grpc.client',
+    'chromadb.db.impl.grpc.server',
+    'chromadb.db.mixins.embeddings_queue',
+    'chromadb.db.mixins.sysdb',
+    'chromadb.execution.executor.abstract',
+    'chromadb.execution.executor.distributed',
+    'chromadb.execution.executor.local',
+    'chromadb.execution.expression.operator',
+    'chromadb.execution.expression.plan',
+    'chromadb.ingest.impl.utils',
+    'chromadb.logservice.logservice',
+    'chromadb.segment.impl.distributed.segment_directory',
+    'chromadb.segment.impl.metadata.sqlite',
+    'chromadb.segment.impl.vector.batch',
+    'chromadb.segment.impl.vector.brute_force_index',
+    'chromadb.segment.impl.vector.hnsw_params',
+    'chromadb.segment.impl.vector.local_hnsw',
+    'chromadb.segment.impl.vector.local_persistent_hnsw',
+]
+
 # Additional hidden imports for PyQt6 and all v3.0 dependencies
 hiddenimports += [
     # GUI framework

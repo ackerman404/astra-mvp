@@ -62,7 +62,7 @@ def get_whisper_model() -> WhisperModel:
                 model_path,
                 device=WHISPER_DEVICE,
                 compute_type=WHISPER_COMPUTE_TYPE,
-                cpu_threads=1,
+                cpu_threads=4,
                 num_workers=1,
             )
         else:
@@ -72,6 +72,7 @@ def get_whisper_model() -> WhisperModel:
                 WHISPER_MODEL,
                 device=WHISPER_DEVICE,
                 compute_type=WHISPER_COMPUTE_TYPE,
+                cpu_threads=4,
                 download_root=user_cache_dir("astra"),
             )
         print("Model loaded.", flush=True)
@@ -99,7 +100,9 @@ def transcribe_audio(audio_array: np.ndarray) -> str:
     model = get_whisper_model()
     segments, _ = model.transcribe(
         audio_float32,
-        beam_size=1,
+        beam_size=3,
+        language="en",
+        condition_on_previous_text=False,
         vad_filter=True,
         vad_parameters=dict(min_silence_duration_ms=500)
     )

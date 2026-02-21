@@ -6,7 +6,7 @@
 - ✅ **v2.0 GUI & Security** - Phases 1-4 (shipped 2026-01-20)
 - ✅ **v2.1 Dual-Pane Answers** - Phases 5-7 (shipped 2026-01-21)
 - ✅ **v2.2 Customization** - Phase 8 (shipped 2026-01-21)
-- 🚧 **v3.0 Online Distribution & License Gating** - Phases 9-12 (in progress)
+- ✅ **v3.0 Online Distribution & License Gating** - Phases 9-12 (shipped 2026-02-21)
 
 ## Phases
 
@@ -17,7 +17,7 @@
 - [x] **Phase 9: Backend Proxy & License Service** - FastAPI proxy server with license key validation and management CLI
 - [x] **Phase 10: Desktop App Integration** - Route LLM calls through proxy, remove client-side API key
 - [x] **Phase 11: License Key UI & First-Run Experience** - Activation screen, error states, offline grace period
-- [ ] **Phase 12: Windows Installer & Distribution** - PyInstaller + Inno Setup packaging for Windows
+- [x] **Phase 12: Windows Installer & Distribution** - PyInstaller + Inno Setup packaging for Windows
 
 ## Phase Details
 
@@ -84,7 +84,7 @@ Plans:
 **Plans**: TBD
 
 Plans:
-- [ ] 12-01: Windows installer packaging (checkpoint pending)
+- [x] 12-01: Windows installer packaging
 
 ## Progress
 
@@ -96,7 +96,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12
 | 9. Backend Proxy & License Service | 2/2 | Complete | 2026-02-17 |
 | 10. Desktop App Integration | 2/2 | Complete | 2026-02-17 |
 | 11. License Key UI & First-Run | 1/1 | Complete | 2026-02-17 |
-| 12. Windows Installer & Distribution | 0/1 | In progress | - |
+| 12. Windows Installer & Distribution | 1/1 | Complete | 2026-02-21 |
 
 ---
 
