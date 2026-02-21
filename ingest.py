@@ -31,8 +31,17 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 # Max chunks to embed + upsert in one batch (keeps memory bounded)
 UPSERT_BATCH_SIZE = 200
 
-# Cross-platform path for ChromaDB
-CHROMA_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+# Cross-platform path for ChromaDB.
+# In a frozen exe, __file__ points to the PyInstaller temp extraction dir (_MEIxxxxxx),
+# not the persistent install dir. Use sys.executable's directory instead so the DB
+# persists across restarts (next to Astra.exe).
+def _get_chroma_db_path() -> str:
+    if getattr(sys, 'frozen', False):
+        # Frozen: place DB next to the exe, not in the temp extraction dir
+        return os.path.join(os.path.dirname(sys.executable), "chroma_db")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+
+CHROMA_DB_PATH = _get_chroma_db_path()
 
 
 def read_txt_file(file_path: Path) -> str:
