@@ -11,6 +11,7 @@ block_cipher = None
 from PyInstaller.utils.hooks import collect_data_files, collect_submodules
 
 datas = []
+binaries = []
 
 # Bundle the pre-downloaded Whisper model (avoids huggingface_hub at runtime)
 datas += [('whisper_model', 'whisper_model')]
@@ -18,7 +19,11 @@ datas += [('whisper_model', 'whisper_model')]
 # Collect faster-whisper assets (ONNX models, etc.)
 datas += collect_data_files('faster_whisper')
 
-# Collect chromadb data files (ONNX models, migration files)
+# Collect chromadb data files (ONNX models, migration SQL files, etc.)
+# collect_data_files captures the .sql files but NOT __init__.py stubs for
+# namespace packages (subdirs without __init__.py). The runtime hook below
+# registers those subdirs as importable namespace packages so
+# importlib_resources.files("chromadb.migrations.*") resolves correctly.
 datas += collect_data_files('chromadb')
 
 # chromadb uses pkgutil.iter_modules() to discover embedding functions at runtime,
@@ -49,6 +54,16 @@ hiddenimports += [
     'chromadb.segment.impl.vector.hnsw_params',
     'chromadb.segment.impl.vector.local_hnsw',
     'chromadb.segment.impl.vector.local_persistent_hnsw',
+    # importlib_resources — used by chromadb.db.impl.sqlite to locate migration dirs
+    'importlib_resources',
+    'importlib_resources.abc',
+    'importlib_resources.readers',
+    'importlib_resources.simple',
+    'importlib_resources._adapters',
+    'importlib_resources._common',
+    'importlib_resources._functional',
+    'importlib_resources._itertools',
+    'importlib_resources.compat.py39',
 ]
 
 # Additional hidden imports for PyQt6 and all v3.0 dependencies
@@ -63,8 +78,8 @@ hiddenimports += [
     'openai',
     # Numerical
     'numpy',
-    # PDF parsing
-    'pdfplumber',
+    # PDF parsing (pure Python — no C extensions, works in frozen exe)
+    'pypdf',
     # Config directory resolution
     'platformdirs',
     # License activation HTTP calls
@@ -97,12 +112,17 @@ if sys.platform == 'win32':
 a = Analysis(
     ['main.py'],
     pathex=['.'],
-    binaries=[],
+    binaries=binaries,
     datas=datas,
     hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
-    runtime_hooks=[],
+    # rthook_chromadb_migrations.py: registers chromadb.migrations.* namespace
+    # packages (embeddings_queue, sysdb, metadb) in sys.modules so that
+    # importlib_resources.files("chromadb.migrations.embeddings_queue") resolves
+    # correctly in the frozen exe. Without this, ChromaDB crashes on first DB
+    # access with "No module named 'chromadb.migrations.embeddings_queue'".
+    runtime_hooks=['hooks/rthook_chromadb_migrations.py'],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
