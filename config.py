@@ -99,7 +99,7 @@ def clear_license_key() -> bool:
 # Proxy URL management
 # ---------------------------------------------------------------------------
 
-_DEFAULT_PROXY_URL = "https://backend-production-1dff.up.railway.app/v1"
+_DEFAULT_PROXY_URL = "https://astra-mvp.onrender.com/v1"
 
 
 def get_proxy_url() -> str:
