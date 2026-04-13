@@ -156,10 +156,12 @@ async def health_check(request: Request):
 from backend.auth import router as license_router  # noqa: E402
 from backend.proxy import router as proxy_router  # noqa: E402
 from backend.admin import router as admin_router  # noqa: E402
+from backend.dashboard import router as dashboard_router  # noqa: E402
 
 app.include_router(license_router)
 app.include_router(proxy_router)
 app.include_router(admin_router)
+app.include_router(dashboard_router)
 
 
 if __name__ == "__main__":

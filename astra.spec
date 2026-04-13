@@ -124,6 +124,12 @@ a = Analysis(
     # access with "No module named 'chromadb.migrations.embeddings_queue'".
     runtime_hooks=['hooks/rthook_chromadb_migrations.py'],
     excludes=[],
+    # Collect chromadb as .py source files instead of compiled .pyc bytecode.
+    # PyInstaller's frozen importer can interfere with chroma-hnswlib's C extension,
+    # causing segfaults during HNSW index operations (GitHub #3947). Collecting as
+    # source lets Python's standard import mechanism handle the modules, which
+    # avoids the frozen importer conflict with the native extension.
+    module_collection_mode={'chromadb': 'py'},
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,
@@ -149,7 +155,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
-    icon=None,  # Add icon path if available: icon='assets/astra.ico'
+    icon='assets/astra.ico',
 )
 
 # COLLECT gathers all files into dist/Astra/ — Inno Setup packages this into the installer

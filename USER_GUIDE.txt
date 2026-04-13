@@ -1,0 +1,309 @@
+================================================================================
+                      ASTRA INTERVIEW COPILOT - USER GUIDE
+                                  Version 3.0
+================================================================================
+
+
+TABLE OF CONTENTS
+-----------------
+  1. What is Astra?
+  2. System Requirements
+  3. Installation
+  4. Getting Started
+  5. License Activation
+  6. Ingesting Your Documents
+  7. Starting an Interview Session
+  8. Using Auto-Answer Mode
+  9. Using Manual Mode
+ 10. Settings & Controls
+ 11. Deactivating Your License
+ 12. Troubleshooting & Common Errors
+ 13. Support & Contact
+
+
+================================================================================
+1. WHAT IS ASTRA?
+================================================================================
+
+Astra Interview Copilot is a desktop application that helps you during
+interviews by:
+
+  - Listening to your system audio in real time
+  - Automatically detecting interview questions
+  - Generating answers based on YOUR resume and documents
+  - Displaying answers in two formats:
+      * Quick bullet points (key talking points)
+      * Conversational script (full response you can speak naturally)
+
+Your documents never leave your computer. Only the interview questions are
+sent to the AI service to generate answers.
+
+
+================================================================================
+2. SYSTEM REQUIREMENTS
+================================================================================
+
+  - Windows 10 or later (64-bit)
+  - Internet connection (required for AI answer generation)
+  - Audio output device (speakers or headphones) for system audio capture
+  - Your resume and relevant documents in .pdf, .txt, or .md format
+
+
+================================================================================
+3. INSTALLATION
+================================================================================
+
+  1. Run AstraSetup.exe
+  2. Follow the installer prompts (Next > Next > Install > Finish)
+  3. No admin rights are required - Astra installs in your user folder
+  4. A desktop shortcut and Start Menu entry will be created
+
+To uninstall: Use "Add or Remove Programs" in Windows Settings.
+Your documents and settings are preserved after uninstall.
+
+
+================================================================================
+4. GETTING STARTED
+================================================================================
+
+Quick Start (3 steps):
+
+  Step 1:  Launch Astra and activate your license key
+  Step 2:  Ingest your documents (resume, job descriptions, etc.)
+  Step 3:  Start a session and join your interview
+
+
+================================================================================
+5. LICENSE ACTIVATION
+================================================================================
+
+When you first launch Astra, you will see the License Activation screen.
+
+  1. Copy your license key from the purchase email
+  2. Paste it into the text field (Ctrl+V)
+  3. Click "Activate License"
+
+  - Green message  = Success! You're good to go.
+  - Red message    = Invalid key. Double-check and try again.
+  - Yellow message = Server offline. Key is saved and will validate later.
+
+You can also click "Skip for now" to ingest documents without a license,
+but you will need a valid license to use the interview session features.
+
+Each license key is tied to one computer at a time. To use Astra on a
+different machine, deactivate the license first (see Section 11).
+
+
+================================================================================
+6. INGESTING YOUR DOCUMENTS
+================================================================================
+
+Before your first interview session, you need to feed Astra your documents
+so it can generate personalized answers.
+
+  1. From the startup screen, click "Ingest Documents"
+  2. Select a folder containing your files
+  3. Wait for the progress bar to complete
+
+SUPPORTED FILE TYPES:
+  - .pdf  (resumes, job descriptions, certifications)
+  - .txt  (plain text notes, project summaries)
+  - .md   (markdown files)
+
+TIPS:
+  - Put all your documents in one folder for easy ingestion
+  - Include your resume, project descriptions, and role-specific notes
+  - You can re-ingest anytime to add new documents
+  - Large PDFs are processed page by page (you'll see progress)
+
+WHAT TO INCLUDE:
+  - Your resume / CV
+  - Job description for the role you're interviewing for
+  - Project summaries or STAR-format stories you've prepared
+  - Technical notes relevant to the position
+
+
+================================================================================
+7. STARTING AN INTERVIEW SESSION
+================================================================================
+
+  1. From the startup screen, click "Start Session"
+  2. The main Astra window will open with a compact toolbar at the top
+  3. Make sure your interview audio is playing through your computer
+     (e.g., Zoom, Teams, Google Meet, phone call on speaker)
+  4. Click the "Listen" button to start capturing audio
+  5. Astra will automatically detect questions and generate answers
+
+IMPORTANT: Astra captures your SYSTEM AUDIO (what comes out of your
+speakers/headphones). Your interview call must be playing through your
+computer for Astra to hear the interviewer's questions.
+
+
+================================================================================
+8. USING AUTO-ANSWER MODE
+================================================================================
+
+Auto-answer mode is enabled by default. Here's how it works:
+
+  1. Click "Listen" to start
+  2. Astra continuously monitors your system audio
+  3. When someone stops speaking (silence detected), Astra transcribes
+     what was said
+  4. If it detects an interview question, it automatically generates
+     an answer
+  5. The answer appears in two panels:
+       - Left side:  Quick bullet points (glance-friendly)
+       - Right side: Full conversational script
+
+STATE INDICATORS (top-left of toolbar):
+  - White circle  = Ready / Idle
+  - Blue circle   = Listening (waiting for speech)
+  - Green circle  = Hearing speech
+  - Yellow circle = Processing (transcribing & classifying)
+  - Purple circle = Generating answer
+
+The Q&A History panel on the left keeps all previous questions and answers
+from your session. Click any history card to review past answers.
+
+
+================================================================================
+9. USING MANUAL MODE
+================================================================================
+
+If you prefer to control when Astra generates answers:
+
+  1. Open Settings (gear icon in toolbar)
+  2. Uncheck "Auto-answer"
+  3. Click "Listen" to start audio capture
+  4. When you want an answer, click the "Answer" button
+  5. Astra will transcribe the last few seconds of audio and generate
+     an answer
+
+This is useful when you want to be selective about which questions
+Astra responds to.
+
+
+================================================================================
+10. SETTINGS & CONTROLS
+================================================================================
+
+Click the gear icon in the toolbar to expand the settings panel.
+
+AUDIO DEVICE
+  Select which audio output device to capture from. Use the "Test"
+  button to verify Astra can hear your audio.
+
+JOB CONTEXT
+  Enter the job title you're interviewing for (e.g., "Senior SAP MM
+  Consultant"). This helps Astra tailor answers to the role.
+
+AUTO-ANSWER
+  Toggle automatic question detection and answer generation on/off.
+
+CONFIDENCE SLIDER
+  Controls how confident Astra needs to be that something is a question
+  before generating an answer.
+    - Lower value = More sensitive (answers more often, may respond to
+      non-questions)
+    - Higher value = More selective (only answers clear questions)
+    - Default is usually fine for most interviews
+
+TONE
+  Choose the conversational tone for the script answer (e.g., professional,
+  friendly, confident).
+
+
+================================================================================
+11. DEACTIVATING YOUR LICENSE
+================================================================================
+
+To transfer your license to a different computer:
+
+  1. Open Settings (gear icon in toolbar)
+  2. Scroll to the right end of the settings panel
+  3. Click "Deactivate License"
+  4. Confirm the deactivation
+
+After deactivating, you can activate the same license key on another machine.
+
+
+================================================================================
+12. TROUBLESHOOTING & COMMON ERRORS
+================================================================================
+
+PROBLEM: "No audio monitor devices found"
+  - Make sure your audio drivers are installed
+  - On Windows, check that your speakers/headphones appear in Sound Settings
+  - Restart Astra after plugging in a new audio device
+
+PROBLEM: Astra is not hearing the interview audio
+  - Your interview call must play through your computer speakers
+  - Check that the correct audio device is selected in Settings
+  - Use the "Test" button to verify audio capture is working
+  - Make sure your interview app (Zoom/Teams/Meet) audio output matches
+    the device selected in Astra
+
+PROBLEM: "License key is not valid"
+  - Double-check that you copied the full key with no extra spaces
+  - Make sure you're using the key from your purchase email
+  - If the issue persists, contact support (see below)
+
+PROBLEM: "Key is active on another machine"
+  - Your license is currently activated on a different computer
+  - Deactivate it on the other machine first, then try again
+  - If you no longer have access to that machine, contact support
+
+PROBLEM: "Connection error" or "Server offline" during activation
+  - Check your internet connection
+  - The server may be temporarily down. Your key is saved locally and
+    will validate automatically when the server is back online.
+
+PROBLEM: Answers are slow or not appearing
+  - Check your internet connection (answers require an online connection)
+  - The AI service may be under heavy load. Wait a moment and try again.
+  - If answers consistently fail, check that your license is active
+
+PROBLEM: "Service is busy. Please wait."
+  - You've hit the rate limit. Wait a few seconds before the next question.
+  - This protects the service from overload and resets automatically.
+
+PROBLEM: Ingestion crashes or fails
+  - Try ingesting fewer files at once
+  - Very large PDFs (100+ pages) may take longer to process
+  - If a specific file fails, try converting it to .txt format
+  - Check that your files are not corrupted or password-protected
+
+PROBLEM: Astra doesn't detect questions correctly
+  - Adjust the Confidence slider in Settings:
+      Lower = detects more (but may false-trigger)
+      Higher = more selective
+  - Make sure the audio quality is clear (reduce background noise)
+  - Astra works best with clear English speech
+
+PROBLEM: App won't start or crashes on launch
+  - Try running as administrator (right-click > Run as administrator)
+  - Reinstall Astra using the installer
+  - Make sure Windows is up to date
+
+
+================================================================================
+13. SUPPORT & CONTACT
+================================================================================
+
+If you encounter any issues not covered above, or if you need help with
+your license key, please reach out to us:
+
+  Email:  srinaidu4data@gmail.com
+
+When contacting support, please include:
+  - A description of the problem
+  - Any error messages you see
+  - Your Windows version (Settings > System > About)
+  - Your Astra version (shown in the window title)
+
+We'll get back to you as soon as possible.
+
+
+================================================================================
+                        Thank you for using Astra!
+================================================================================

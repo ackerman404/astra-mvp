@@ -76,16 +76,14 @@ async def validate_license(
 
     provided_key = credentials.credentials
 
-    # Look up key in database
-    statement = select(LicenseKey)
-    results = session.exec(statement).all()
+    # Look up key by indexed column (O(1) via DB index), then verify with
+    # timing-safe comparison to prevent timing side-channels.
+    statement = select(LicenseKey).where(LicenseKey.key == provided_key)
+    db_key = session.exec(statement).first()
 
-    # Use timing-safe comparison to prevent timing attacks
-    db_key = None
-    for k in results:
-        if hmac.compare_digest(k.key, provided_key):
-            db_key = k
-            break
+    # Timing-safe verification to prevent subtle oracle attacks
+    if db_key is not None and not hmac.compare_digest(db_key.key, provided_key):
+        db_key = None
 
     if db_key is None:
         raise HTTPException(
@@ -127,14 +125,8 @@ async def validate_license(
 @router.post("/activate", response_model=ActivateResponse, responses={403: {"model": ErrorResponse}})
 async def activate_license(body: ActivateRequest, session: Session = Depends(get_session)):
     """Activate a license key, binding it to a hardware ID."""
-    statement = select(LicenseKey)
-    results = session.exec(statement).all()
-
-    db_key = None
-    for k in results:
-        if hmac.compare_digest(k.key, body.license_key):
-            db_key = k
-            break
+    statement = select(LicenseKey).where(LicenseKey.key == body.license_key)
+    db_key = session.exec(statement).first()
 
     if db_key is None:
         raise HTTPException(
@@ -172,14 +164,8 @@ async def activate_license(body: ActivateRequest, session: Session = Depends(get
 @router.post("/deactivate", response_model=DeactivateResponse, responses={403: {"model": ErrorResponse}})
 async def deactivate_license(body: DeactivateRequest, session: Session = Depends(get_session)):
     """Deactivate a license key, unbinding it from the current hardware."""
-    statement = select(LicenseKey)
-    results = session.exec(statement).all()
-
-    db_key = None
-    for k in results:
-        if hmac.compare_digest(k.key, body.license_key):
-            db_key = k
-            break
+    statement = select(LicenseKey).where(LicenseKey.key == body.license_key)
+    db_key = session.exec(statement).first()
 
     if db_key is None:
         raise HTTPException(

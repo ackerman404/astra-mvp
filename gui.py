@@ -4,6 +4,9 @@ Astra Interview Copilot - PyQt6 GUI
 Captures system audio and provides AI-powered interview answers.
 """
 
+import json
+import os
+import subprocess
 import sys
 import threading
 import argparse
@@ -82,6 +85,8 @@ class SignalBridge(QObject):
     bullet_token = pyqtSignal(str)            # Streaming token for bullet points
     script_token = pyqtSignal(str)            # Streaming token for script
     question_update = pyqtSignal(str)         # Update question display
+    # License deactivation result (success: bool, message: str)
+    deactivation_result = pyqtSignal(bool, str)
 
 
 class IngestionSignals(QObject):
@@ -289,86 +294,118 @@ class StartupScreen(QWidget):
 
 
 class LicenseActivationScreen(QWidget):
-    """Styled license activation screen with color-coded feedback."""
+    """Friendly license activation screen with clear guidance and paste support."""
 
     activated = pyqtSignal()
     skipped = pyqtSignal()
+    _activation_result = pyqtSignal(str, str)  # (status_msg, color_type)
 
     def __init__(self):
         super().__init__()
         self._init_ui()
+        self._activation_result.connect(self._handle_activation_result)
 
     def _init_ui(self):
         """Set up the activation screen UI."""
         self.setWindowTitle("Astra - License Activation")
-        self.setMinimumSize(400, 450)
-        self.resize(400, 450)
+        self.setMinimumSize(420, 520)
+        self.resize(420, 520)
         self.setStyleSheet("background-color: #ffffff;")
 
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(40, 40, 40, 40)
+        layout.setSpacing(12)
+        layout.setContentsMargins(40, 35, 40, 30)
 
         # Title
         title = QLabel("Astra Interview Copilot")
-        title.setFont(QFont("Sans", 18, QFont.Weight.Bold))
+        title.setFont(QFont("Sans", 20, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title.setStyleSheet("color: #222222;")
         layout.addWidget(title)
 
         # Subtitle
-        subtitle = QLabel("License Activation")
-        subtitle.setFont(QFont("Sans", 12))
+        subtitle = QLabel("Activate Your License")
+        subtitle.setFont(QFont("Sans", 13))
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         subtitle.setStyleSheet("color: #666666;")
         layout.addWidget(subtitle)
 
-        layout.addStretch()
+        layout.addSpacing(10)
 
-        # License key input
+        # Step-by-step instructions
+        steps = QLabel(
+            "1. Copy your license key from the purchase email\n"
+            "2. Paste it below (Ctrl+V)\n"
+            "3. Click Activate"
+        )
+        steps.setFont(QFont("Sans", 10))
+        steps.setStyleSheet("""
+            QLabel {
+                color: #555555;
+                background-color: #f8f9fa;
+                border: 1px solid #e9ecef;
+                border-radius: 6px;
+                padding: 12px 16px;
+            }
+        """)
+        steps.setWordWrap(True)
+        layout.addWidget(steps)
+
+        layout.addSpacing(5)
+
+        # License key input — larger, with paste hint
         self.key_input = QLineEdit()
-        self.key_input.setPlaceholderText("Enter your license key")
-        self.key_input.setFont(QFont("Sans", 14))
+        self.key_input.setPlaceholderText("Paste license key here (Ctrl+V)")
+        self.key_input.setFont(QFont("Consolas", 13))
         self.key_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.key_input.setMinimumHeight(45)
+        self.key_input.setMinimumHeight(50)
         self.key_input.setStyleSheet("""
             QLineEdit {
                 border: 2px solid #ddd;
                 border-radius: 8px;
-                padding: 8px 12px;
+                padding: 10px 14px;
                 background-color: #ffffff;
                 color: #222222;
             }
             QLineEdit:focus {
                 border-color: #4a90d9;
+                background-color: #f0f7ff;
             }
         """)
+        # Allow Enter key to activate
+        self.key_input.returnPressed.connect(self._on_activate)
         layout.addWidget(self.key_input)
 
         # Status label (hidden initially)
         self.status_label = QLabel("")
-        self.status_label.setFont(QFont("Sans", 12))
+        self.status_label.setFont(QFont("Sans", 11))
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.status_label.setWordWrap(True)
+        self.status_label.setMinimumHeight(40)
         self.status_label.setVisible(False)
         layout.addWidget(self.status_label)
 
-        # Activate button
-        self.activate_btn = QPushButton("Activate")
-        self.activate_btn.setFont(QFont("Sans", 12))
-        self.activate_btn.setMinimumHeight(50)
+        # Activate button — big and friendly
+        self.activate_btn = QPushButton("Activate License")
+        self.activate_btn.setFont(QFont("Sans", 13, QFont.Weight.Bold))
+        self.activate_btn.setMinimumHeight(52)
+        self.activate_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.activate_btn.setStyleSheet("""
             QPushButton {
-                background-color: #4a90d9;
+                background-color: #28a745;
                 color: white;
                 border: none;
                 border-radius: 8px;
             }
             QPushButton:hover {
-                background-color: #3a7bc8;
+                background-color: #218838;
+            }
+            QPushButton:pressed {
+                background-color: #1e7e34;
             }
             QPushButton:disabled {
-                background-color: #cccccc;
+                background-color: #a0d4b0;
+                color: #e0e0e0;
             }
         """)
         self.activate_btn.clicked.connect(self._on_activate)
@@ -376,8 +413,11 @@ class LicenseActivationScreen(QWidget):
 
         layout.addStretch()
 
-        # Purchase link
-        purchase_link = QLabel('<a href="#" style="color: #4a90d9;">Where do I get a license key?</a>')
+        # Purchase link — more visible
+        purchase_link = QLabel(
+            '<a href="#" style="color: #4a90d9; text-decoration: none;">'
+            'Don\'t have a key? Get one at astra-copilot.com</a>'
+        )
         purchase_link.setFont(QFont("Sans", 10))
         purchase_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         purchase_link.linkActivated.connect(
@@ -385,8 +425,13 @@ class LicenseActivationScreen(QWidget):
         )
         layout.addWidget(purchase_link)
 
-        # Continue without license link
-        skip_link = QLabel('<a href="#" style="color: #999999;">Continue without license</a>')
+        layout.addSpacing(5)
+
+        # Continue without license — smaller, clearly secondary
+        skip_link = QLabel(
+            '<a href="#" style="color: #aaaaaa; text-decoration: none;">'
+            'Skip for now (limited features)</a>'
+        )
         skip_link.setFont(QFont("Sans", 9))
         skip_link.setAlignment(Qt.AlignmentFlag.AlignCenter)
         skip_link.linkActivated.connect(self._on_skip)
@@ -401,21 +446,29 @@ class LicenseActivationScreen(QWidget):
             "info": "background-color: #e2e3e5; color: #383d41; border: 1px solid #d6d8db;",
         }
         style = styles.get(color_type, styles["info"])
-        self.status_label.setStyleSheet(f"QLabel {{ {style} border-radius: 6px; padding: 8px 12px; }}")
+        self.status_label.setStyleSheet(f"QLabel {{ {style} border-radius: 6px; padding: 10px 14px; }}")
         self.status_label.setText(msg)
         self.status_label.setVisible(True)
 
     def _on_activate(self):
-        """Handle activate button click."""
+        """Handle activate button click — runs network call in background thread."""
         self.activate_btn.setEnabled(False)
-        self._set_status("Activating...", "info")
+        self.activate_btn.setText("Activating...")
+        self._set_status("Contacting server...", "info")
 
         key = self.key_input.text().strip()
         if not key:
-            self._set_status("Please enter a license key", "error")
+            self._set_status("Please paste your license key above", "error")
             self.activate_btn.setEnabled(True)
+            self.activate_btn.setText("Activate License")
+            self.key_input.setFocus()
             return
 
+        thread = threading.Thread(target=self._activate_in_background, args=(key,), daemon=True)
+        thread.start()
+
+    def _activate_in_background(self, key: str):
+        """Background thread: call license activation API without blocking GUI."""
         proxy_url = get_proxy_url()
         hw_id = get_hardware_id()
         try:
@@ -427,27 +480,47 @@ class LicenseActivationScreen(QWidget):
             )
             if resp.status_code == 200:
                 save_license_key(key)
-                self._set_status("License activated successfully!", "success")
-                QTimer.singleShot(500, self.activated.emit)
+                self._activation_result.emit("License activated! Starting Astra...", "success")
             else:
                 error = resp.json().get("detail", {}).get("error", {})
-                msg = error.get("message", "Activation failed.")
-                self._set_status(msg, "error")
-                self.activate_btn.setEnabled(True)
+                msg = error.get("message", "Activation failed. Check your key and try again.")
+                self._activation_result.emit(msg, "error")
         except requests.ConnectionError:
             save_license_key(key)
-            self._set_status("Key saved — will validate when online", "warning")
-            QTimer.singleShot(1000, self.activated.emit)
+            self._activation_result.emit(
+                "Saved! Server is offline — key will be validated next time.", "warning"
+            )
         except Exception as e:
-            self._set_status(f"Error: {e}", "error")
+            self._activation_result.emit(f"Connection error: {e}", "error")
+
+    def _handle_activation_result(self, msg: str, color_type: str):
+        """Handle activation result on the main thread (signal handler)."""
+        self._set_status(msg, color_type)
+        self.activate_btn.setText("Activate License")
+        if color_type in ("success", "warning"):
+            delay = 800 if color_type == "success" else 1200
+            QTimer.singleShot(delay, self.activated.emit)
+        else:
             self.activate_btn.setEnabled(True)
+            self.key_input.setFocus()
+            self.key_input.selectAll()
 
     def _on_skip(self):
         """Handle continue without license."""
         self.skipped.emit()
 
+    def reset(self):
+        """Reset the screen for re-display (e.g. after deactivation)."""
+        self.key_input.clear()
+        self.status_label.setVisible(False)
+        self.activate_btn.setEnabled(True)
+        self.activate_btn.setText("Activate License")
+
 
 class AstraWindow(QMainWindow):
+    # Emitted after successful deactivation so AstraApp can switch screens
+    license_deactivated = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.capture = None
@@ -811,9 +884,23 @@ class AstraWindow(QMainWindow):
 
         row2.addStretch()
 
-        self.deactivate_btn = QPushButton("Deactivate")
+        # License status indicator
+        license_key = get_license_key()
+        if license_key and len(license_key) > 8:
+            key_display = license_key[:4] + "..." + license_key[-4:]
+        elif license_key:
+            key_display = "****"
+        else:
+            key_display = "None"
+        self.license_status_label = QLabel(f"Key: {key_display}")
+        self.license_status_label.setFont(QFont("Sans", 8))
+        self.license_status_label.setStyleSheet("color: #28a745;" if license_key else "color: #dc3545;")
+        row2.addWidget(self.license_status_label)
+
+        self.deactivate_btn = QPushButton("Deactivate License")
         self.deactivate_btn.setFont(QFont("Sans", 9))
-        self.deactivate_btn.setToolTip("Deactivate license on this machine")
+        self.deactivate_btn.setToolTip("Deactivate license on this machine and free it for another device")
+        self.deactivate_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self.deactivate_btn.setStyleSheet("""
             QPushButton {
                 background-color: rgba(220, 53, 69, 180);
@@ -824,6 +911,10 @@ class AstraWindow(QMainWindow):
             }
             QPushButton:hover {
                 background-color: rgba(200, 35, 51, 210);
+            }
+            QPushButton:disabled {
+                background-color: rgba(180, 180, 180, 150);
+                color: #e0e0e0;
             }
         """)
         self.deactivate_btn.clicked.connect(self._deactivate_license)
@@ -1058,6 +1149,7 @@ class AstraWindow(QMainWindow):
         self.signals.bullet_token.connect(self._on_bullet_token)
         self.signals.script_token.connect(self._on_script_token)
         self.signals.question_update.connect(self._on_question_update)
+        self.signals.deactivation_result.connect(self._on_deactivation_result)
 
     def _set_buttons_enabled(self, enabled: bool):
         """Enable/disable control buttons."""
@@ -1271,7 +1363,19 @@ class AstraWindow(QMainWindow):
         if not self.capture or not self.is_listening:
             return
 
-        level = self.capture.get_audio_level()
+        try:
+            level = self.capture.get_audio_level()
+        except Exception as e:
+            # Audio device may have disconnected (headphones unplugged, etc.)
+            # Try to recover by reinitializing the capture device.
+            self.signals.error_occurred.emit(f"Audio device error: {e}")
+            try:
+                self._stop_listening()
+                self._init_capture()
+                self.signals.status_update.emit("Status: Audio device reconnected — click Listen to resume")
+            except Exception:
+                self.signals.status_update.emit("Status: Audio device lost — select a new device")
+            return
         self.level_bar.setValue(int(level * 100))
 
         # Auto-answer mode processing
@@ -1329,22 +1433,27 @@ class AstraWindow(QMainWindow):
         thread.start()
 
     def _auto_process_audio(self):
-        """Background thread: auto-transcribe, classify, and optionally answer."""
+        """Background thread: auto-transcribe, classify, and optionally answer.
+
+        RELIABILITY: This method is the core interview loop. Every code path
+        must reset is_processing and restore state to LISTENING so the app
+        can keep answering questions even after transient failures.
+        """
         try:
+            # Guard against capture being None (device disconnected)
+            if self.capture is None:
+                return
+
             # Get recent audio (last few seconds based on speech duration)
             audio = self.capture.get_last_n_seconds(10)
 
             if len(audio) == 0:
-                self.signals.state_changed.emit(ListeningState.LISTENING)
-                self.is_processing = False
                 return
 
             # Transcribe
             text = transcribe_audio(audio)
 
             if not text or not text.strip():
-                self.signals.state_changed.emit(ListeningState.LISTENING)
-                self.is_processing = False
                 return
 
             # Update last heard
@@ -1355,14 +1464,10 @@ class AstraWindow(QMainWindow):
 
             if not classification["is_interview_question"]:
                 self.signals.last_heard_update.emit(text, "ignored")
-                self.signals.state_changed.emit(ListeningState.LISTENING)
-                self.is_processing = False
                 return
 
             if classification["confidence"] < self.confidence_threshold:
                 self.signals.last_heard_update.emit(text, "low_confidence")
-                self.signals.state_changed.emit(ListeningState.LISTENING)
-                self.is_processing = False
                 return
 
             # It's an interview question with sufficient confidence - generate answer
@@ -1379,13 +1484,12 @@ class AstraWindow(QMainWindow):
             self._generate_parallel(question)
             self.signals.answer_done.emit()
 
-            self.signals.state_changed.emit(ListeningState.LISTENING)
-
         except Exception as e:
-            self.signals.error_occurred.emit(str(e))
-            self.signals.state_changed.emit(ListeningState.LISTENING)
+            self.signals.error_occurred.emit(f"Auto-answer error: {e}")
         finally:
+            # ALWAYS reset processing state so the loop can continue
             self.is_processing = False
+            self.signals.state_changed.emit(ListeningState.LISTENING)
 
             # Check if there are queued questions
             if not self.question_queue.empty():
@@ -1433,6 +1537,9 @@ class AstraWindow(QMainWindow):
 
         except Exception as e:
             self.signals.error_occurred.emit(str(e))
+        finally:
+            # ALWAYS re-enable buttons so the user can retry
+            self.signals.answer_done.emit()
 
     def _generate_parallel(self, question: str):
         """Generate bullet and script responses in parallel threads."""
@@ -1457,9 +1564,20 @@ class AstraWindow(QMainWindow):
         with ThreadPoolExecutor(max_workers=2) as executor:
             bullet_future = executor.submit(stream_bullets)
             script_future = executor.submit(stream_script)
-            # Wait for both to complete (futures handle exceptions internally)
-            bullet_future.result()
-            script_future.result()
+            # Wait with timeout so a hung API call can't block forever.
+            # 60s is generous — typical answer streams complete in 5-15s.
+            try:
+                bullet_future.result(timeout=60)
+            except TimeoutError:
+                self.signals.error_occurred.emit("Bullet generation timed out")
+            except Exception:
+                pass  # Already handled inside stream_bullets
+            try:
+                script_future.result(timeout=60)
+            except TimeoutError:
+                self.signals.error_occurred.emit("Script generation timed out")
+            except Exception:
+                pass  # Already handled inside stream_script
 
     def _on_test_audio(self):
         """Test audio capture for 3 seconds."""
@@ -1630,22 +1748,41 @@ class AstraWindow(QMainWindow):
             self.queue_label.setText("")
 
     def _deactivate_license(self):
-        """Deactivate license and exit app."""
+        """Deactivate license — friendly confirmation, then background network call."""
+        # Show current key (masked) so user knows what they're deactivating
+        license_key = get_license_key()
+        if not license_key:
+            QMessageBox.information(
+                self, "No License",
+                "No license key is currently active.\n\n"
+                "You can activate one from the startup screen."
+            )
+            return
+
+        masked = license_key[:4] + "..." + license_key[-4:] if len(license_key) > 8 else "****"
         reply = QMessageBox.question(
             self, "Deactivate License",
-            "This will deactivate your license on this machine.\n"
-            "You can then activate it on another machine.\n\n"
+            f"Current key: {masked}\n\n"
+            "Deactivating frees this key so you can use it\n"
+            "on another machine.\n\n"
+            "You'll return to the activation screen.\n\n"
             "Continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply != QMessageBox.StandardButton.Yes:
             return
 
-        license_key = get_license_key()
-        if not license_key:
-            QMessageBox.warning(self, "No License", "No license key is currently active.")
-            return
+        self.deactivate_btn.setEnabled(False)
+        self.deactivate_btn.setText("Deactivating...")
+        self.status_label.setText("Status: Deactivating license...")
 
+        thread = threading.Thread(
+            target=self._deactivate_in_background, args=(license_key,), daemon=True
+        )
+        thread.start()
+
+    def _deactivate_in_background(self, license_key: str):
+        """Background thread: call license deactivation API."""
         proxy_url = get_proxy_url()
         hw_id = get_hardware_id()
         try:
@@ -1657,14 +1794,35 @@ class AstraWindow(QMainWindow):
             )
             if resp.status_code == 200:
                 clear_license_key()
-                QMessageBox.information(self, "Deactivated", "License deactivated. You can activate on another machine.")
-                sys.exit(0)
+                self.signals.deactivation_result.emit(True, "License deactivated successfully.")
             else:
                 error = resp.json().get("detail", {}).get("error", {})
-                msg = error.get("message", "Deactivation failed.")
-                QMessageBox.warning(self, "Error", msg)
+                msg = error.get("message", "Deactivation failed. Please try again.")
+                self.signals.deactivation_result.emit(False, msg)
+        except requests.ConnectionError:
+            # Server unreachable — still clear locally so user isn't stuck
+            clear_license_key()
+            self.signals.deactivation_result.emit(
+                True,
+                "License cleared locally. Server was unreachable,\n"
+                "so the remote deactivation will happen automatically."
+            )
         except Exception as e:
-            QMessageBox.warning(self, "Error", f"Could not reach server: {e}")
+            self.signals.deactivation_result.emit(False, f"Connection error: {e}")
+
+    def _on_deactivation_result(self, success: bool, message: str):
+        """Handle deactivation result on the main thread."""
+        self.deactivate_btn.setEnabled(True)
+        self.deactivate_btn.setText("Deactivate")
+        if success:
+            # Stop listening cleanly before switching screens
+            if self.is_listening:
+                self._stop_listening()
+            QMessageBox.information(self, "License Deactivated", message)
+            self.license_deactivated.emit()
+        else:
+            QMessageBox.warning(self, "Deactivation Failed", message)
+            self.status_label.setText("Status: Ready")
 
     def closeEvent(self, event):
         """Clean up on close."""
@@ -1689,8 +1847,8 @@ class AstraApp:
         self.activation_screen.activated.connect(self._on_license_activated)
         self.activation_screen.skipped.connect(self._on_license_skipped)
 
-        # Thread for background ingestion
-        self._ingest_thread = None
+        # Subprocess for background ingestion (crash-isolated from GUI)
+        self._ingest_process = None
 
     def _on_license_activated(self):
         """Handle successful license activation."""
@@ -1702,6 +1860,14 @@ class AstraApp:
         self.activation_screen.hide()
         self.startup_screen.show()
 
+    def _on_license_deactivated(self):
+        """Handle license deactivation — return to activation screen."""
+        if self.session_window is not None:
+            self.session_window.hide()
+        self.startup_screen.hide()
+        self.activation_screen.reset()
+        self.activation_screen.show()
+
     def show(self):
         """Show the appropriate screen based on license state."""
         if get_license_key():
@@ -1710,8 +1876,16 @@ class AstraApp:
             self.activation_screen.show()
 
     def _on_ingest(self):
-        """Handle document ingestion request — opens a folder picker dialog."""
-        import os
+        """Handle document ingestion request — opens a folder picker dialog.
+
+        Ingestion runs as a SUBPROCESS (not a thread) for crash isolation.
+        ChromaDB's hnswlib C extension can segfault in PyInstaller frozen exes
+        (GitHub #3947). Running in a subprocess means a segfault only kills the
+        child process — the GUI survives and can report the error to the user.
+
+        The subprocess uses main.py --ingest FOLDER --json-progress, which emits
+        JSON lines to stdout for progress reporting.
+        """
         from PyQt6.QtWidgets import QFileDialog
 
         # Open folder picker starting from user's Documents directory
@@ -1735,35 +1909,149 @@ class AstraApp:
         self._ingestion_signals.progress.connect(self._on_ingestion_progress)
         self._ingestion_signals.complete.connect(self._on_ingestion_complete)
 
-        # Run ingestion in background thread
-        self._ingest_thread = threading.Thread(
-            target=self._run_ingestion,
-            args=(documents_path,),
-            daemon=True
-        )
-        self._ingest_thread.start()
+        # Build the subprocess command.
+        # In frozen exe: sys.executable is Astra.exe, which routes --ingest to ingest.py
+        # In dev mode: sys.executable is python.exe, run main.py --ingest
+        if getattr(sys, 'frozen', False):
+            cmd = [sys.executable, "--ingest", documents_path, "--json-progress"]
+        else:
+            main_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "main.py")
+            cmd = [sys.executable, main_py, "--ingest", documents_path, "--json-progress"]
 
-    def _run_ingestion(self, folder_path: str):
-        """Background thread: run document ingestion with progress reporting."""
-        from ingest import ingest_folder_with_progress
-
-        def progress_callback(info: dict):
-            """Emit progress signal from background thread."""
-            self._ingestion_signals.progress.emit(info)
-
+        # Launch ingestion as a subprocess with stdout pipe for JSON progress.
+        # CREATE_NO_WINDOW prevents a console flash on Windows.
+        # The subprocess is fully isolated — if hnswlib segfaults, only the
+        # child process dies; the GUI continues running and detects the crash.
+        self._ingest_completed = False
+        creationflags = 0
+        if sys.platform == "win32":
+            creationflags = subprocess.CREATE_NO_WINDOW
         try:
-            result = ingest_folder_with_progress(folder_path, progress_callback)
-            self._ingestion_signals.complete.emit(result)
+            self._ingest_process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                creationflags=creationflags,
+            )
         except Exception as e:
+            self.startup_screen.set_buttons_enabled(True)
+            self.startup_screen.show_progress_bar(False)
+            self.startup_screen.set_status(f"Failed to start ingestion: {e}", is_error=True)
+            return
+
+        # Reader thread: reads JSON lines from subprocess stdout and emits signals.
+        # This thread does NOT run ChromaDB code — it just reads a pipe — so it
+        # cannot segfault. If the subprocess dies, the pipe closes and readline()
+        # returns empty, ending the loop cleanly.
+        self._ingest_reader = threading.Thread(
+            target=self._read_ingest_output,
+            daemon=True,
+        )
+        self._ingest_reader.start()
+
+        # Watchdog: periodically check if subprocess died without emitting result.
+        # Unlike the old thread-based watchdog, this WORKS because the subprocess
+        # crash does not kill the GUI process.
+        self._ingest_watchdog = QTimer()
+        self._ingest_watchdog.timeout.connect(self._check_ingest_process)
+        self._ingest_watchdog.start(1000)  # Check every second
+
+    def _read_ingest_output(self):
+        """Reader thread: parse JSON lines from ingestion subprocess stdout.
+
+        Each line from the subprocess is a JSON object with progress info or the
+        final result. This thread emits Qt signals to update the UI.
+
+        If the subprocess crashes (segfault), the pipe breaks and readline()
+        returns b'', ending the loop. The watchdog timer detects the dead process.
+        """
+        proc = self._ingest_process
+        if proc is None or proc.stdout is None:
+            return
+
+        last_result = None
+        try:
+            for raw_line in proc.stdout:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                stage = data.get("stage", "")
+
+                if stage == "result":
+                    # Final result line — emit completion
+                    last_result = data
+                    self._ingestion_signals.complete.emit({
+                        "success": data.get("success", False),
+                        "total_files": data.get("total_files", 0),
+                        "total_chunks": data.get("total_chunks", 0),
+                        "errors": data.get("errors", []),
+                    })
+                else:
+                    # Progress update
+                    self._ingestion_signals.progress.emit(data)
+        except Exception:
+            pass  # Pipe broken or other IO error — watchdog handles cleanup
+
+        # Wait for process to fully exit
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            pass
+
+        # If we never got a result line, the subprocess crashed
+        if last_result is None and not self._ingest_completed:
+            exit_code = proc.returncode if proc.returncode is not None else -1
+            # Read stderr for crash details
+            stderr_text = ""
+            try:
+                if proc.stderr:
+                    stderr_text = proc.stderr.read().decode("utf-8", errors="replace").strip()
+            except Exception:
+                pass
+
+            error_msg = (
+                f"Ingestion process crashed (exit code {exit_code}). "
+                "This is typically caused by a native code error in ChromaDB's "
+                "vector index. Check ingest_crash.log next to the application."
+            )
+            if stderr_text:
+                error_msg += f"\n\nDetails: {stderr_text[:500]}"
+
             self._ingestion_signals.complete.emit({
                 "success": False,
                 "total_files": 0,
                 "total_chunks": 0,
-                "errors": [str(e)]
+                "errors": [error_msg],
             })
 
+    def _check_ingest_process(self):
+        """Watchdog: detect if ingestion subprocess died.
+
+        Unlike the old thread-based approach, this WORKS because the subprocess
+        runs in a separate process. A segfault in hnswlib kills only the child —
+        the GUI process (and this timer) keep running.
+        """
+        if self._ingest_completed:
+            # Normal completion — stop watching
+            self._ingest_watchdog.stop()
+            return
+
+        if self._ingest_process is not None:
+            exit_code = self._ingest_process.poll()
+            if exit_code is not None and not self._ingest_completed:
+                # Process exited — the reader thread should handle emitting
+                # the completion signal. Give it a moment, then check again.
+                # If reader thread already emitted, _ingest_completed will be True
+                # on next watchdog tick.
+                pass
+
     def _on_ingestion_progress(self, info: dict):
-        """Handle progress updates from ingestion thread."""
+        """Handle progress updates from ingestion subprocess."""
         stage = info.get("stage", "")
         total_files = info.get("total_files", 0)
         current_index = info.get("current_file_index", 0)
@@ -1781,6 +2069,9 @@ class AstraApp:
 
     def _on_ingestion_complete(self, result: dict):
         """Handle ingestion completion."""
+        self._ingest_completed = True
+        if hasattr(self, '_ingest_watchdog') and self._ingest_watchdog.isActive():
+            self._ingest_watchdog.stop()
         self.startup_screen.set_buttons_enabled(True)
         self.startup_screen.show_progress_bar(False)
 
@@ -1820,12 +2111,17 @@ class AstraApp:
             return
 
         # Create session window if not exists
-        if self.session_window is None:
-            self.session_window = AstraWindow()
+        self._ensure_session_window()
 
         # Hide startup, show session
         self.startup_screen.hide()
         self.session_window.show()
+
+    def _ensure_session_window(self):
+        """Create the session window if it doesn't exist yet, and wire signals."""
+        if self.session_window is None:
+            self.session_window = AstraWindow()
+            self.session_window.license_deactivated.connect(self._on_license_deactivated)
 
     def _on_license_activated_start_session(self):
         """Handle activation from start session flow -- go directly to session."""
@@ -1838,8 +2134,7 @@ class AstraApp:
         self.activation_screen.activated.connect(self._on_license_activated)
 
         # Create session window if not exists
-        if self.session_window is None:
-            self.session_window = AstraWindow()
+        self._ensure_session_window()
 
         self.session_window.show()
 

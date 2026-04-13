@@ -30,6 +30,9 @@ if getattr(sys, 'frozen', False) and sys.platform == 'win32':
             except OSError:
                 pass
 
+import logging
+import threading
+
 import numpy as np
 from faster_whisper import WhisperModel
 
@@ -41,15 +44,25 @@ from config import (
     WHISPER_COMPUTE_TYPE,
 )
 
+logger = logging.getLogger("astra.transcriber")
 
-# Global Whisper model (lazy loaded)
+# Global Whisper model (lazy loaded, thread-safe)
 _whisper_model = None
+_whisper_lock = threading.Lock()
 
 
 def get_whisper_model() -> WhisperModel:
-    """Get or initialize the Whisper model."""
+    """Get or initialize the Whisper model (thread-safe)."""
     global _whisper_model
-    if _whisper_model is None:
+    if _whisper_model is not None:
+        return _whisper_model
+
+    with _whisper_lock:
+        # Double-check after acquiring lock
+        if _whisper_model is not None:
+            return _whisper_model
+
+        logger.info("Loading Whisper model '%s'...", WHISPER_MODEL)
         print(f"Loading Whisper model '{WHISPER_MODEL}'...", flush=True)
 
         frozen = getattr(sys, 'frozen', False)

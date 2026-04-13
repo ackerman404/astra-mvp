@@ -6,17 +6,31 @@ Supports hybrid search (dense + sparse) with Reciprocal Rank Fusion.
 """
 
 from collections.abc import Generator
+import logging
 import os
 import re
+import sys
+import time
 
 import chromadb
-from openai import OpenAI
+import httpx
+from openai import OpenAI, APIConnectionError, APITimeoutError, RateLimitError, APIStatusError
 import json
 
 from config import get_license_key, get_proxy_url, load_prompts_config
 
-# Cross-platform path for ChromaDB
-CHROMA_DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+logger = logging.getLogger("astra.rag")
+
+# Cross-platform path for ChromaDB.
+# In a frozen exe, __file__ points to the PyInstaller temp extraction dir (_MEIxxxxxx),
+# not the persistent install dir. Use sys.executable's directory instead so the DB
+# persists across restarts (next to Astra.exe).
+def _get_chroma_db_path() -> str:
+    if getattr(sys, 'frozen', False):
+        return os.path.join(os.path.dirname(sys.executable), "chroma_db")
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
+
+CHROMA_DB_PATH = _get_chroma_db_path()
 
 COLLECTION_NAME = "astra_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
@@ -32,13 +46,109 @@ SPARSE_WEIGHT = 0.5  # Weight for sparse (BM25) results in fusion
 _prompts_config = None
 
 
+# Reusable OpenAI client (created once, reused across calls)
+_openai_client: OpenAI | None = None
+_openai_client_key: str | None = None  # Track key to detect changes
+
+
 def _get_openai_client() -> OpenAI:
-    """Create OpenAI client routed through the backend proxy."""
+    """Get or create OpenAI client with sensible timeouts.
+
+    The client is cached and reused. If the license key changes
+    (e.g. re-activation), a new client is created automatically.
+    """
+    global _openai_client, _openai_client_key
+
     license_key = get_license_key()
     if not license_key:
         raise RuntimeError("License key not configured. Please activate your license in the app.")
+
+    # Reuse existing client if key hasn't changed
+    if _openai_client is not None and _openai_client_key == license_key:
+        return _openai_client
+
     proxy_url = get_proxy_url()
-    return OpenAI(api_key=license_key, base_url=proxy_url)
+    _openai_client = OpenAI(
+        api_key=license_key,
+        base_url=proxy_url,
+        timeout=httpx.Timeout(connect=5.0, read=30.0, write=10.0, pool=5.0),
+        max_retries=0,  # We handle retries ourselves for better control
+    )
+    _openai_client_key = license_key
+    return _openai_client
+
+
+# Transient errors worth retrying
+_RETRYABLE = (APIConnectionError, APITimeoutError, RateLimitError)
+_MAX_RETRIES = 2
+_RETRY_DELAYS = (1.0, 3.0)  # seconds between retries
+
+
+def _call_with_retry(fn, *args, **kwargs):
+    """Call *fn* with automatic retry on transient OpenAI errors.
+
+    Retries up to _MAX_RETRIES times with backoff. Non-transient errors
+    (auth failures, bad requests) are raised immediately.
+    """
+    last_exc = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            return fn(*args, **kwargs)
+        except _RETRYABLE as exc:
+            last_exc = exc
+            if attempt < _MAX_RETRIES:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning("OpenAI transient error (attempt %d/%d), retrying in %.1fs: %s",
+                               attempt + 1, _MAX_RETRIES + 1, delay, exc)
+                time.sleep(delay)
+            else:
+                logger.error("OpenAI failed after %d attempts: %s", _MAX_RETRIES + 1, exc)
+        except APIStatusError as exc:
+            # 5xx = server error, worth retrying; 4xx = client error, don't retry
+            if exc.status_code >= 500 and attempt < _MAX_RETRIES:
+                delay = _RETRY_DELAYS[attempt]
+                logger.warning("OpenAI server error %d (attempt %d/%d), retrying in %.1fs",
+                               exc.status_code, attempt + 1, _MAX_RETRIES + 1, delay)
+                time.sleep(delay)
+                last_exc = exc
+            else:
+                raise
+    raise last_exc
+
+# Cached ChromaDB client (created once, reused across searches)
+_chroma_client: chromadb.ClientAPI | None = None
+
+
+def _get_chroma_client() -> chromadb.ClientAPI | None:
+    """Get or create a cached ChromaDB PersistentClient.
+
+    Returns None if the chroma_db directory doesn't exist yet
+    (no documents ingested).
+    """
+    global _chroma_client
+
+    if not os.path.exists(CHROMA_DB_PATH):
+        return None
+
+    if _chroma_client is not None:
+        return _chroma_client
+
+    try:
+        _chroma_client = chromadb.PersistentClient(
+            path=CHROMA_DB_PATH,
+            settings=chromadb.Settings(anonymized_telemetry=False),
+        )
+        return _chroma_client
+    except Exception as e:
+        logger.error("Failed to open ChromaDB: %s", e)
+        return None
+
+
+def invalidate_chroma_client():
+    """Reset cached ChromaDB client. Call after ingestion to pick up new data."""
+    global _chroma_client
+    _chroma_client = None
+
 
 # BM25 index cache
 _bm25_index = None
@@ -73,15 +183,11 @@ def _load_bm25_index():
     if _bm25_index is not None:
         return _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
 
-    # Check if chroma_db exists
-    if not os.path.exists(CHROMA_DB_PATH):
+    chroma_client = _get_chroma_client()
+    if chroma_client is None:
         return None, None, None, None
 
     try:
-        chroma_client = chromadb.PersistentClient(
-            path=CHROMA_DB_PATH,
-            settings=chromadb.Settings(anonymized_telemetry=False),
-        )
         collection = chroma_client.get_collection(name=COLLECTION_NAME)
     except Exception:
         return None, None, None, None
@@ -107,7 +213,7 @@ def _load_bm25_index():
         from rank_bm25 import BM25Okapi
         _bm25_index = BM25Okapi(tokenized_docs)
     except ImportError:
-        print("Warning: rank_bm25 not installed. Falling back to dense-only search.")
+        logger.warning("rank_bm25 not installed. Falling back to dense-only search.")
         return None, None, None, None
 
     return _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
@@ -115,13 +221,14 @@ def _load_bm25_index():
 
 def invalidate_bm25_cache():
     """
-    Invalidate BM25 cache. Call this after ingesting new documents.
+    Invalidate BM25 and ChromaDB caches. Call this after ingesting new documents.
     """
     global _bm25_index, _bm25_documents, _bm25_doc_ids, _bm25_metadatas
     _bm25_index = None
     _bm25_documents = None
     _bm25_doc_ids = None
     _bm25_metadatas = None
+    invalidate_chroma_client()
 
 
 def _search_bm25(query: str, top_k: int = 20) -> list[dict]:
@@ -165,14 +272,11 @@ def _search_dense(query: str, top_k: int = 20) -> list[dict]:
     Search using dense embeddings (original method).
     Returns list of {text, source_file, similarity_score, doc_id, rank}.
     """
-    if not os.path.exists(CHROMA_DB_PATH):
+    chroma_client = _get_chroma_client()
+    if chroma_client is None:
         return []
 
     try:
-        chroma_client = chromadb.PersistentClient(
-            path=CHROMA_DB_PATH,
-            settings=chromadb.Settings(anonymized_telemetry=False),
-        )
         collection = chroma_client.get_collection(name=COLLECTION_NAME)
     except Exception:
         return []
@@ -182,11 +286,16 @@ def _search_dense(query: str, top_k: int = 20) -> list[dict]:
 
     openai_client = _get_openai_client()
 
-    # Embed the query
-    response = openai_client.embeddings.create(
-        model=EMBEDDING_MODEL,
-        input=query
-    )
+    # Embed the query (with retry for transient failures)
+    try:
+        response = _call_with_retry(
+            openai_client.embeddings.create,
+            model=EMBEDDING_MODEL,
+            input=query,
+        )
+    except Exception as e:
+        logger.error("Embedding search failed: %s", e)
+        return []
     query_embedding = response.data[0].embedding
 
     # Search ChromaDB
@@ -442,14 +551,15 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
     openai_client = _get_openai_client()
 
     try:
-        response = openai_client.chat.completions.create(
+        response = _call_with_retry(
+            openai_client.chat.completions.create,
             model=CLASSIFICATION_MODEL,
             messages=[
                 {"role": "system", "content": get_prompt("classification")},
                 {"role": "user", "content": f"Classify this: \"{text}\""}
             ],
             max_tokens=100,
-            temperature=0
+            temperature=0,
         )
 
         result_text = response.choices[0].message.content.strip()
@@ -466,7 +576,7 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
 
     except (json.JSONDecodeError, KeyError) as e:
         # If parsing fails, be conservative and don't auto-answer
-        print(f"Classification parse error: {e}")
+        logger.warning("Classification parse error: %s", e)
         return {
             "is_interview_question": False,
             "question_type": "not_a_question",
@@ -474,7 +584,7 @@ def classify_utterance(text: str, min_words: int = 3) -> dict:
             "cleaned_question": text
         }
     except Exception as e:
-        print(f"Classification error: {e}")
+        logger.error("Classification error: %s", e)
         return {
             "is_interview_question": False,
             "question_type": "not_a_question",
@@ -765,19 +875,24 @@ INTERVIEW QUESTION: {question}
 
 Give a confident, technically rich answer the candidate can speak out loud verbatim. Follow the structure in your instructions."""
 
-    stream = openai_client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": get_prompt("star_system") or DEFAULT_STAR_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ],
-        stream=True,
-        temperature=0.7  # Slight creativity for natural speech
-    )
+    try:
+        stream = _call_with_retry(
+            openai_client.chat.completions.create,
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": get_prompt("star_system") or DEFAULT_STAR_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            stream=True,
+            temperature=0.7,
+        )
 
-    for chunk in stream:
-        if chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except Exception as e:
+        logger.error("Star response generation failed: %s", e)
+        yield f"\n[Answer generation failed: {e}. Try again.]"
 
 
 def ask(question: str, job_context: str = "") -> Generator[str, None, None]:
@@ -831,19 +946,24 @@ INTERVIEW QUESTION: {question}
 
 Generate exactly 2-3 bullet points. Be concise and technical."""
 
-    stream = openai_client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": get_prompt("bullet_system") or DEFAULT_BULLET_SYSTEM_PROMPT},
-            {"role": "user", "content": user_message}
-        ],
-        stream=True,
-        temperature=0.3  # More focused output for bullets
-    )
+    try:
+        stream = _call_with_retry(
+            openai_client.chat.completions.create,
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": get_prompt("bullet_system") or DEFAULT_BULLET_SYSTEM_PROMPT},
+                {"role": "user", "content": user_message}
+            ],
+            stream=True,
+            temperature=0.3,
+        )
 
-    for chunk in stream:
-        if chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except Exception as e:
+        logger.error("Bullet response generation failed: %s", e)
+        yield f"\n[Bullet generation failed: {e}]"
 
 
 def ask_bullet(question: str, job_context: str = "") -> Generator[str, None, None]:
@@ -904,19 +1024,24 @@ INTERVIEW QUESTION: {question}
 
 Generate a natural, speakable answer (150-250 words) the candidate can read aloud verbatim."""
 
-    stream = openai_client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ],
-        stream=True,
-        temperature=0.7  # Creative for natural flow
-    )
+    try:
+        stream = _call_with_retry(
+            openai_client.chat.completions.create,
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_message}
+            ],
+            stream=True,
+            temperature=0.7,
+        )
 
-    for chunk in stream:
-        if chunk.choices[0].delta.content:
-            yield chunk.choices[0].delta.content
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+    except Exception as e:
+        logger.error("Script response generation failed: %s", e)
+        yield f"\n[Script generation failed: {e}. Try again.]"
 
 
 def ask_script(question: str, job_context: str = "", tone: str = "professional") -> Generator[str, None, None]:

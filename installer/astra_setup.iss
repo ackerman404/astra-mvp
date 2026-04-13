@@ -14,7 +14,7 @@ OutputDir=..\dist
 OutputBaseFilename=AstraSetup
 Compression=lzma2/ultra64
 SolidCompression=yes
-; SetupIconFile=..\assets\astra.ico
+SetupIconFile=..\assets\astra.ico
 UninstallDisplayIcon={app}\Astra.exe
 WizardStyle=modern
 DisableProgramGroupPage=auto
@@ -24,15 +24,19 @@ ArchitecturesInstallIn64BitMode=x64compatible
 [Files]
 ; Copy the entire PyInstaller --onedir output into the install directory
 Source: "..\dist\Astra\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Bundle user guide and icon in the install directory
+Source: "..\USER_GUIDE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\assets\astra.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Tasks]
 Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
 
 [Icons]
 ; Desktop shortcut (optional, user chooses during install)
-Name: "{userdesktop}\Astra Interview Copilot"; Filename: "{app}\Astra.exe"; Tasks: desktopicon
+Name: "{userdesktop}\Astra Interview Copilot"; Filename: "{app}\Astra.exe"; IconFilename: "{app}\astra.ico"; Tasks: desktopicon
 ; Start Menu entries
-Name: "{group}\Astra Interview Copilot"; Filename: "{app}\Astra.exe"
+Name: "{group}\Astra Interview Copilot"; Filename: "{app}\Astra.exe"; IconFilename: "{app}\astra.ico"
+Name: "{group}\User Guide"; Filename: "{app}\USER_GUIDE.txt"
 Name: "{group}\Uninstall Astra"; Filename: "{uninstallexe}"
 
 [UninstallDelete]

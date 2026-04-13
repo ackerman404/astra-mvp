@@ -35,5 +35,12 @@ whisper_model/
 build_log.txt
 build_final_log.txt
 
+# Database files
+astra_backend.db
+*.db
+
+# Zip archives
+*.zip
+
 # Temp files
 =*

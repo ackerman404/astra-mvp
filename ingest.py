@@ -3,7 +3,8 @@
 Document ingestion script for Astra MVP.
 Reads documents from a folder, chunks them, embeds with OpenAI, and stores in ChromaDB.
 
-Uses PyMuPDF (fitz) for PDF extraction — C-based, memory-efficient even for 100MB+ PDFs.
+Uses pdfplumber for PDF extraction, processes page-by-page with batched upserts.
+Runs in a subprocess from the GUI so crashes can't kill the main app.
 """
 from __future__ import annotations
 
@@ -16,20 +17,45 @@ from pathlib import Path
 from collections.abc import Callable
 
 import chromadb
-import fitz  # PyMuPDF
+from pypdf import PdfReader
 from openai import OpenAI
 
 from config import get_license_key, get_proxy_url
 
 logger = logging.getLogger("astra.ingest")
 
+# In frozen windowed exe, configure file-based logging so crash diagnostics
+# are preserved even if the process dies. The log file is written next to
+# the exe (e.g. dist/Astra/ingest.log).
+def _setup_frozen_logging():
+    if not getattr(sys, 'frozen', False):
+        return
+    try:
+        log_path = os.path.join(os.path.dirname(sys.executable), "ingest.log")
+        handler = logging.FileHandler(log_path, mode='w', encoding='utf-8')
+        handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s %(name)s: %(message)s'
+        ))
+        logger.addHandler(handler)
+        logger.setLevel(logging.DEBUG)
+    except Exception:
+        pass  # Can't set up logging — continue without it
+
+_setup_frozen_logging()
+
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 50
 COLLECTION_NAME = "astra_docs"
 EMBEDDING_MODEL = "text-embedding-3-small"
 
-# Max chunks to embed + upsert in one batch (keeps memory bounded)
-UPSERT_BATCH_SIZE = 200
+# Max chunks to embed in one OpenAI API call (keeps request size bounded)
+UPSERT_BATCH_SIZE = 50
+
+# Max chunks to upsert to ChromaDB in a single collection.upsert() call.
+# chroma-hnswlib (C extension) crashes in PyInstaller frozen exes when the
+# HNSW graph update processes too many vectors at once (GitHub #3947).
+# Small sub-batches keep each C-level graph update manageable.
+UPSERT_SUB_BATCH = 10
 
 # Cross-platform path for ChromaDB.
 # In a frozen exe, __file__ points to the PyInstaller temp extraction dir (_MEIxxxxxx),
@@ -37,7 +63,6 @@ UPSERT_BATCH_SIZE = 200
 # persists across restarts (next to Astra.exe).
 def _get_chroma_db_path() -> str:
     if getattr(sys, 'frozen', False):
-        # Frozen: place DB next to the exe, not in the temp extraction dir
         return os.path.join(os.path.dirname(sys.executable), "chroma_db")
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "chroma_db")
 
@@ -80,35 +105,28 @@ def clean_pdf_text(text: str) -> str:
     return text.strip()
 
 
-def extract_pdf_page(doc: fitz.Document, page_num: int) -> str:
-    """Extract and clean text from a single PDF page using PyMuPDF."""
-    page = doc.load_page(page_num)
-    text = page.get_text("text")
-
-    if not text or not text.strip():
-        return ""
-
-    cleaned = clean_pdf_text(text)
-    if not cleaned:
-        return ""
-
-    if doc.page_count > 1:
-        return f"[Page {page_num + 1}]\n{cleaned}"
-    return cleaned
-
-
 def read_file(file_path: Path) -> str:
     """Read content from a file based on its extension."""
     suffix = file_path.suffix.lower()
     if suffix == ".pdf":
-        doc = fitz.open(file_path)
-        parts = []
-        for i in range(doc.page_count):
-            page_text = extract_pdf_page(doc, i)
-            if page_text:
-                parts.append(page_text)
-        doc.close()
-        return "\n\n".join(parts)
+        text_parts = []
+        reader = PdfReader(file_path)
+        total_pages = len(reader.pages)
+        for page_num, page in enumerate(reader.pages, 1):
+            try:
+                page_text = page.extract_text()
+                if not page_text or not page_text.strip():
+                    continue
+                cleaned = clean_pdf_text(page_text)
+                if cleaned:
+                    if total_pages > 1:
+                        text_parts.append(f"[Page {page_num}]\n{cleaned}")
+                    else:
+                        text_parts.append(cleaned)
+            except Exception as e:
+                logger.warning("Error extracting page %d of %s: %s", page_num, file_path.name, e)
+                continue
+        return "\n\n".join(text_parts)
     elif suffix in (".txt", ".md"):
         return read_txt_file(file_path)
     else:
@@ -159,6 +177,21 @@ def get_doc_type(file_path: Path) -> str:
     }.get(suffix, "unknown")
 
 
+def _flush_logs():
+    """Flush all log handlers so crash diagnostics are written to disk."""
+    for handler in logger.handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+    # Also flush root logger handlers
+    for handler in logging.getLogger().handlers:
+        try:
+            handler.flush()
+        except Exception:
+            pass
+
+
 def _upsert_batch(
     collection,
     openai_client: OpenAI,
@@ -166,17 +199,53 @@ def _upsert_batch(
     ids: list[str],
     metadatas: list[dict],
 ) -> int:
-    """Embed and upsert a batch of chunks. Returns number of chunks upserted."""
+    """Embed and upsert a batch of chunks. Returns number of chunks upserted.
+
+    Embeds all chunks in one OpenAI API call for efficiency, then upserts to
+    ChromaDB in small sub-batches (UPSERT_SUB_BATCH at a time). This prevents
+    chroma-hnswlib from crashing during HNSW graph updates in PyInstaller
+    frozen exes, where the C extension is sensitive to large batch sizes.
+    """
     if not chunks:
         return 0
+
+    total = len(chunks)
+    logger.debug("Embedding %d chunks...", len(chunks))
+    _flush_logs()
     embeddings = get_embeddings(openai_client, chunks)
-    collection.upsert(
-        ids=ids,
-        embeddings=embeddings,
-        documents=chunks,
-        metadatas=metadatas,
-    )
-    return len(chunks)
+    logger.debug("Embeddings received (%d vectors, dim=%d)", len(embeddings), len(embeddings[0]) if embeddings else 0)
+    _flush_logs()
+
+    # Upsert in small sub-batches to avoid C-level crash in chroma-hnswlib.
+    # The HNSW index update is the crash point — smaller batches keep each
+    # native-code graph update manageable in the frozen exe environment.
+    upserted = 0
+    for start in range(0, total, UPSERT_SUB_BATCH):
+        end = min(start + UPSERT_SUB_BATCH, total)
+        batch_size = end - start
+        logger.debug("Upserting sub-batch %d-%d of %d to ChromaDB...", start + 1, end, total)
+        _flush_logs()
+
+        try:
+            collection.upsert(
+                ids=ids[start:end],
+                embeddings=embeddings[start:end],
+                documents=chunks[start:end],
+                metadatas=metadatas[start:end],
+            )
+            upserted += batch_size
+            logger.debug("Sub-batch %d-%d upserted OK", start + 1, end)
+        except Exception as e:
+            logger.error("Upsert failed on sub-batch %d-%d: %s: %s", start + 1, end, type(e).__name__, e)
+            _flush_logs()
+            raise
+
+        # Release memory between sub-batches — helps in constrained frozen exe
+        gc.collect()
+
+    logger.debug("Upsert complete for %d chunks", upserted)
+    _flush_logs()
+    return upserted
 
 
 def ingest_folder_with_progress(
@@ -186,7 +255,7 @@ def ingest_folder_with_progress(
     """
     Ingest all supported documents from a folder into ChromaDB with progress reporting.
 
-    Memory-safe: processes PDFs page-by-page with PyMuPDF and upserts in batches.
+    Processes PDFs page-by-page and upserts in batches to keep memory bounded.
     """
     folder = Path(folder_path)
     errors: list[str] = []
@@ -229,6 +298,7 @@ def ingest_folder_with_progress(
         print(f"Found {total_files} file(s) to process.")
 
     # Initialize OpenAI client
+    logger.info("Initializing OpenAI client...")
     license_key = get_license_key()
     if not license_key:
         msg = "License key not configured. Activate your license in the app."
@@ -237,20 +307,58 @@ def ingest_folder_with_progress(
         return {"success": False, "total_files": total_files, "total_chunks": 0, "errors": [msg]}
     proxy_url = get_proxy_url()
     openai_client = OpenAI(api_key=license_key, base_url=proxy_url)
+    logger.info("OpenAI client ready (proxy: %s)", proxy_url)
 
     # Initialize ChromaDB (disable telemetry — posthog 6.0+ broke the API chromadb 0.6.x uses)
+    logger.info("Initializing ChromaDB at %s", CHROMA_DB_PATH)
     chroma_client = chromadb.PersistentClient(
         path=CHROMA_DB_PATH,
         settings=chromadb.Settings(anonymized_telemetry=False),
     )
-    collection = chroma_client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": "cosine"}
-    )
+    logger.info("ChromaDB PersistentClient created")
+    try:
+        collection = chroma_client.get_or_create_collection(
+            name=COLLECTION_NAME,
+            metadata={
+                "hnsw:space": "cosine",
+                # Pre-allocate HNSW index to avoid resize operations.
+                # hnswlib's index resize (realloc + memcpy) segfaults in
+                # PyInstaller frozen exes. Default batch_size=100 triggers
+                # a resize at ~100 vectors, crashing ingestion. Setting a
+                # large initial capacity avoids any resize during ingestion.
+                "hnsw:batch_size": 50000,
+                # Single-threaded HNSW operations — OpenMP threading in
+                # hnswlib can misbehave in frozen exe environments.
+                "hnsw:num_threads": 1,
+            }
+        )
+    except (KeyError, Exception) as e:
+        # Corrupted DB from older chromadb version — wipe and retry
+        if "KeyError" in type(e).__name__ or "_type" in str(e):
+            logger.warning("ChromaDB incompatible/corrupted, resetting: %s", e)
+            import shutil
+            shutil.rmtree(CHROMA_DB_PATH, ignore_errors=True)
+            chroma_client = chromadb.PersistentClient(
+                path=CHROMA_DB_PATH,
+                settings=chromadb.Settings(anonymized_telemetry=False),
+            )
+            collection = chroma_client.get_or_create_collection(
+                name=COLLECTION_NAME,
+                metadata={
+                    "hnsw:space": "cosine",
+                    "hnsw:batch_size": 50000,
+                    "hnsw:num_threads": 1,
+                }
+            )
+        else:
+            raise
+
+    logger.info("Collection '%s' ready", COLLECTION_NAME)
 
     total_chunks = 0
 
     for idx, file_path in enumerate(files):
+        logger.info("Processing file %d/%d: %s", idx + 1, total_files, file_path.name)
         report("processing", message=f"Processing {file_path.name}",
                total_files=total_files, current_file_index=idx,
                current_file_name=file_path.name, current_file_chunks=0,
@@ -293,6 +401,7 @@ def ingest_folder_with_progress(
                     _upsert_batch(collection, openai_client, batch_chunks, batch_ids, batch_metas)
 
             total_chunks += file_chunks
+            logger.info("File complete: %s — %d chunks (total: %d)", file_path.name, file_chunks, total_chunks)
             if not progress_callback:
                 print(f"  Added {file_chunks} chunks to collection")
 
@@ -301,18 +410,21 @@ def ingest_folder_with_progress(
         except Exception as e:
             error_msg = f"Error processing {file_path.name}: {e}"
             errors.append(error_msg)
-            logger.exception("Ingestion error for %s", file_path.name)
+            logger.exception("Ingestion error for %s: %s", file_path.name, e)
             if not progress_callback:
                 print(f"  {error_msg}")
             gc.collect()
             continue
 
     # Invalidate BM25 cache so hybrid search rebuilds index with new documents
+    logger.info("Invalidating BM25 cache...")
     try:
         from rag import invalidate_bm25_cache
         invalidate_bm25_cache()
     except ImportError:
         pass
+
+    logger.info("Ingestion complete: %d files, %d chunks, %d errors", total_files, total_chunks, len(errors))
 
     # Report completion
     report("complete", message=f"Ingestion complete! {total_chunks} chunks added.",
@@ -339,10 +451,10 @@ def _ingest_pdf_streaming(
     verbose: bool,
 ) -> int:
     """
-    Process a PDF page-by-page using PyMuPDF, chunking and upserting in batches.
+    Process a PDF page-by-page using pdfplumber, chunking and upserting in batches.
 
-    PyMuPDF is C-based and handles 100MB+ PDFs without blowing up memory.
-    Each page is extracted, chunked, and flushed to ChromaDB in small batches.
+    Each page is opened, extracted, and released individually to limit memory usage.
+    Chunks are flushed to ChromaDB every UPSERT_BATCH_SIZE chunks.
     """
     file_size_mb = file_path.stat().st_size / (1024 * 1024)
 
@@ -355,14 +467,14 @@ def _ingest_pdf_streaming(
     chunk_counter = 0
     total_file_chunks = 0
 
-    doc = fitz.open(file_path)
-    total_pages = doc.page_count
+    reader = PdfReader(file_path)
+    total_pages = len(reader.pages)
     multi_page = total_pages > 1
 
-    for page_num in range(total_pages):
+    for page_num_idx, page in enumerate(reader.pages):
+        page_num = page_num_idx + 1
         try:
-            page = doc.load_page(page_num)
-            page_text = page.get_text("text")
+            page_text = page.extract_text()
 
             if not page_text or not page_text.strip():
                 continue
@@ -372,7 +484,7 @@ def _ingest_pdf_streaming(
                 continue
 
             if multi_page:
-                cleaned = f"[Page {page_num + 1}]\n{cleaned}"
+                cleaned = f"[Page {page_num}]\n{cleaned}"
 
             page_chunks = chunk_text(cleaned)
 
@@ -392,17 +504,15 @@ def _ingest_pdf_streaming(
                               pending_chunks, pending_ids, pending_metas)
                 total_file_chunks += len(pending_chunks)
                 if verbose:
-                    print(f"  ... {total_file_chunks} chunks so far (page {page_num + 1}/{total_pages})")
+                    print(f"  ... {total_file_chunks} chunks so far (page {page_num}/{total_pages})")
                 pending_chunks.clear()
                 pending_ids.clear()
                 pending_metas.clear()
                 gc.collect()
 
         except Exception as e:
-            logger.warning("Error on page %d of %s: %s", page_num + 1, file_path.name, e)
+            logger.warning("Error on page %d of %s: %s", page_num, file_path.name, e)
             continue
-
-    doc.close()
 
     # Flush remaining
     if pending_chunks:

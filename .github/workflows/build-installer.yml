@@ -1,0 +1,59 @@
+name: Build Windows Installer
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  workflow_dispatch:  # Manual trigger from GitHub UI
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: Download Whisper model (tiny.en)
+        run: |
+          pip install huggingface_hub
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-tiny.en', local_dir='whisper_model')"
+
+      - name: Build with PyInstaller
+        run: pyinstaller astra.spec --clean -y
+
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y --no-progress
+        shell: cmd
+
+      - name: Build installer
+        run: |
+          iscc installer\astra_setup.iss
+        shell: cmd
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AstraSetup
+          path: dist/AstraSetup.exe
+          retention-days: 90
+
+      - name: Upload to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/AstraSetup.exe
+          generate_release_notes: true
