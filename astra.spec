@@ -8,10 +8,27 @@ import sys
 block_cipher = None
 
 # Collect data files for bundled packages
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_submodules, copy_metadata, collect_all
 
 datas = []
 binaries = []
+
+# ---- setuptools / pkg_resources fix for ctranslate2 ----
+# ctranslate2/__init__.py (Windows) does:
+#     import pkg_resources
+#     package_dir = pkg_resources.resource_filename(__name__, "")
+#     os.add_dll_directory(package_dir)
+# In Python 3.12, setuptools is no longer in venvs by default (PEP 632), and even
+# when installed, PyInstaller's built-in pkg_resources hook doesn't always pull
+# everything pkg_resources needs at runtime. collect_all pulls the Python code,
+# binaries, data files, AND metadata — the belt-and-suspenders approach.
+sp_datas, sp_binaries, sp_hiddenimports = collect_all('pkg_resources')
+datas += sp_datas
+binaries += sp_binaries
+
+# Also copy ctranslate2's own package metadata so pkg_resources.resource_filename
+# can locate the package directory.
+datas += copy_metadata('ctranslate2')
 
 # Bundle the pre-downloaded Whisper model (avoids huggingface_hub at runtime)
 datas += [('whisper_model', 'whisper_model')]
@@ -98,12 +115,6 @@ hiddenimports += [
     # Transcription engine
     'faster_whisper',
     'ctranslate2',
-    # ctranslate2 imports pkg_resources (from setuptools) at module load.
-    # PyInstaller doesn't pull setuptools in automatically when the app code
-    # doesn't reference it directly — we have to force-include the submodules.
-    'pkg_resources',
-    'pkg_resources.extern',
-    'pkg_resources._vendor',
     # Environment variable loading
     'dotenv',
     # Crypto (explicit inclusion for some builds)
@@ -111,8 +122,8 @@ hiddenimports += [
     'hmac',
 ]
 
-# Also collect all pkg_resources submodules (it lazy-imports many vendored packages).
-hiddenimports += collect_submodules('pkg_resources')
+# Merge in pkg_resources hidden imports from collect_all() above.
+hiddenimports += sp_hiddenimports
 
 # Add Windows audio imports
 if sys.platform == 'win32':
