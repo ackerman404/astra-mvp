@@ -1,4 +1,7 @@
 # Core dependencies with minimum versions
+# setuptools: Python 3.12 venvs no longer include it by default (PEP 632),
+# but ctranslate2 imports pkg_resources at module load. Required for frozen exe.
+setuptools>=68.0.0
 faster-whisper>=1.0.0,<1.1.0
 ctranslate2>=4.0.0,<4.6.0  # 4.6+ segfaults in PyInstaller frozen exe on Windows
 onnxruntime>=1.14.0,<1.20.0  # 1.20+ may have DLL issues on Windows

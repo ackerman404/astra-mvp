@@ -98,12 +98,21 @@ hiddenimports += [
     # Transcription engine
     'faster_whisper',
     'ctranslate2',
+    # ctranslate2 imports pkg_resources (from setuptools) at module load.
+    # PyInstaller doesn't pull setuptools in automatically when the app code
+    # doesn't reference it directly — we have to force-include the submodules.
+    'pkg_resources',
+    'pkg_resources.extern',
+    'pkg_resources._vendor',
     # Environment variable loading
     'dotenv',
     # Crypto (explicit inclusion for some builds)
     'hashlib',
     'hmac',
 ]
+
+# Also collect all pkg_resources submodules (it lazy-imports many vendored packages).
+hiddenimports += collect_submodules('pkg_resources')
 
 # Add Windows audio imports
 if sys.platform == 'win32':

@@ -2,7 +2,7 @@ name: Build Windows Installer
 
 on:
   push:
-    branches: [master]
+    branches: [master, ui-optimization-branch]
     tags: ['v*']
   workflow_dispatch:  # Manual trigger from GitHub UI
 
@@ -23,6 +23,10 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
+          # Python 3.12 venvs no longer include setuptools by default (PEP 632),
+          # but ctranslate2 imports pkg_resources at module load. Install it
+          # explicitly so PyInstaller can bundle it.
+          pip install setuptools
           pip install -r requirements.txt
           pip install pyinstaller
 
