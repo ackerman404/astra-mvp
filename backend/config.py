@@ -18,5 +18,9 @@ class Settings(BaseSettings):
     OPENAI_TIMEOUT_CLASSIFY: float = 30.0
     ADMIN_SECRET: str = ""  # Set to protect /v1/admin/* endpoints
 
+    # Client version notification (override via Render env vars without redeploy)
+    LATEST_VERSION: str = "1.2.0"
+    DOWNLOAD_URL: str = "https://github.com/ackerman404/astra-mvp/releases/latest"
+
 
 settings = Settings()

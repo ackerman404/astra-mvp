@@ -149,6 +149,23 @@ async def health_check(request: Request):
     return result
 
 
+@app.get("/version")
+async def client_version(request: Request):
+    """Tells the desktop client the latest available version + download URL.
+
+    The client compares its bundled version against `latest`. If older,
+    the client shows an in-app update prompt linking to `download_url`.
+
+    To push an update notification: bump LATEST_VERSION env var on Render.
+    No redeploy required — just restart the service.
+    """
+    cfg = request.app.state.settings
+    return {
+        "latest": cfg.LATEST_VERSION,
+        "download_url": cfg.DOWNLOAD_URL,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Include routers
 # ---------------------------------------------------------------------------

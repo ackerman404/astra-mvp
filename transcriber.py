@@ -113,7 +113,7 @@ def transcribe_audio(audio_array: np.ndarray) -> str:
     model = get_whisper_model()
     segments, _ = model.transcribe(
         audio_float32,
-        beam_size=3,
+        beam_size=1,
         language="en",
         condition_on_previous_text=False,
         vad_filter=True,

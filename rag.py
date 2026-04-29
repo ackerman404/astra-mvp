@@ -6,6 +6,7 @@ Supports hybrid search (dense + sparse) with Reciprocal Rank Fusion.
 """
 
 from collections.abc import Generator
+import hashlib
 import logging
 import os
 import re
@@ -267,6 +268,34 @@ def _search_bm25(query: str, top_k: int = 20) -> list[dict]:
     return results
 
 
+_embedding_cache: dict[str, list[float]] = {}
+_EMBEDDING_CACHE_MAX = 50
+
+
+def _get_embedding(query: str) -> list[float] | None:
+    """Get embedding for query, using cache to avoid duplicate API calls."""
+    cache_key = hashlib.md5(query.encode()).hexdigest()
+    if cache_key in _embedding_cache:
+        return _embedding_cache[cache_key]
+
+    openai_client = _get_openai_client()
+    try:
+        response = _call_with_retry(
+            openai_client.embeddings.create,
+            model=EMBEDDING_MODEL,
+            input=query,
+        )
+    except Exception as e:
+        logger.error("Embedding failed: %s", e)
+        return None
+
+    embedding = response.data[0].embedding
+    if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX:
+        _embedding_cache.pop(next(iter(_embedding_cache)))
+    _embedding_cache[cache_key] = embedding
+    return embedding
+
+
 def _search_dense(query: str, top_k: int = 20) -> list[dict]:
     """
     Search using dense embeddings (original method).
@@ -284,19 +313,9 @@ def _search_dense(query: str, top_k: int = 20) -> list[dict]:
     if collection.count() == 0:
         return []
 
-    openai_client = _get_openai_client()
-
-    # Embed the query (with retry for transient failures)
-    try:
-        response = _call_with_retry(
-            openai_client.embeddings.create,
-            model=EMBEDDING_MODEL,
-            input=query,
-        )
-    except Exception as e:
-        logger.error("Embedding search failed: %s", e)
+    query_embedding = _get_embedding(query)
+    if query_embedding is None:
         return []
-    query_embedding = response.data[0].embedding
 
     # Search ChromaDB
     results = collection.query(
@@ -737,7 +756,7 @@ Generate a natural, conversational answer that the candidate can read aloud verb
 - Write as flowing speech, NOT bullet points
 - Use complete sentences with natural transitions
 - Include verbal connectors: "The key thing here is...", "What's important to note...", "In my experience..."
-- Keep it concise: 150-250 words ideal
+- Keep it tight: 100-150 words ideal (faster to read aloud, faster to generate)
 - End with a follow-up offer: "I can go deeper into X if you'd like"
 
 ## CONTENT STRUCTURE:
@@ -888,7 +907,7 @@ Give a confident, technically rich answer the candidate can speak out loud verba
         )
 
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
     except Exception as e:
         logger.error("Star response generation failed: %s", e)
@@ -959,7 +978,7 @@ Generate exactly 2-3 bullet points. Be concise and technical."""
         )
 
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
     except Exception as e:
         logger.error("Bullet response generation failed: %s", e)
@@ -1022,7 +1041,7 @@ JOB REQUIREMENTS (align answer to these):
 
 INTERVIEW QUESTION: {question}
 
-Generate a natural, speakable answer (150-250 words) the candidate can read aloud verbatim."""
+Generate a natural, speakable answer (100-150 words) the candidate can read aloud verbatim. Keep it tight."""
 
     try:
         stream = _call_with_retry(
@@ -1037,7 +1056,7 @@ Generate a natural, speakable answer (150-250 words) the candidate can read alou
         )
 
         for chunk in stream:
-            if chunk.choices[0].delta.content:
+            if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
     except Exception as e:
         logger.error("Script response generation failed: %s", e)

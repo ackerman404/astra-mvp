@@ -16,6 +16,18 @@ from pathlib import Path
 import yaml
 from platformdirs import user_config_dir
 
+# Application version — bumped on every release.
+# Backend /version endpoint compares against this to notify users of updates.
+__version__ = "1.2.0"
+
+
+def parse_version(v: str) -> tuple[int, ...]:
+    """Parse 'X.Y.Z' into (X, Y, Z) for safe numeric comparison."""
+    try:
+        return tuple(int(x) for x in v.split("."))
+    except (ValueError, AttributeError):
+        return (0, 0, 0)
+
 
 def get_config_dir() -> Path:
     """Get cross-platform user config directory for Astra."""
@@ -346,7 +358,7 @@ SILENCE_THRESHOLD = 0.01        # Audio level below this = silence
 SILENCE_DURATION = 2.0          # Seconds of silence to trigger processing
 MIN_SPEECH_DURATION = 1.0       # Ignore very short utterances (coughs, etc.)
 CLASSIFICATION_CONFIDENCE = 0.7  # Minimum confidence to auto-answer
-MIN_WORDS_FOR_CLASSIFICATION = 3  # Skip LLM if fewer words than this
+MIN_WORDS_FOR_CLASSIFICATION = 5  # Skip LLM if fewer words than this
 
 
 def get_default_monitor() -> str | None:

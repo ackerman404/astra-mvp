@@ -39,6 +39,7 @@ from transcriber import transcribe_audio
 from audio_capture import get_audio_capture
 from rag import (
     ask, ask_bullet, ask_script, classify_utterance,
+    search_context, generate_bullet_response, generate_script_response,
     get_available_tones, get_default_job_context, get_default_tone, reload_prompts_config,
 )
 import requests
@@ -56,6 +57,8 @@ from config import (
     clear_license_key,
     get_hardware_id,
     get_config_dir,
+    __version__ as ASTRA_VERSION,
+    parse_version,
 )
 
 
@@ -559,7 +562,7 @@ class AstraWindow(QMainWindow):
 
     def _init_ui(self):
         """Set up the user interface."""
-        self.setWindowTitle("Astra Interview Copilot")
+        self.setWindowTitle(f"Astra Interview Copilot v{ASTRA_VERSION}")
         self.setMinimumSize(600, 400)
         self.resize(900, 600)
 
@@ -1020,8 +1023,35 @@ class AstraWindow(QMainWindow):
         """)
         answer_outer.addWidget(self.question_display)
 
+        bullets_header = QLabel("Quick Points")
+        bullets_header.setFont(QFont("Sans", 9, QFont.Weight.Bold))
+        bullets_header.setStyleSheet("color: #4a90d9; padding: 0 2px;")
+        answer_outer.addWidget(bullets_header)
+
+        self.bullets_box = QTextEdit()
+        self.bullets_box.setReadOnly(True)
+        self.bullets_box.setPlaceholderText("Bullets appear first (fastest)...")
+        self.bullets_box.setFont(QFont("Sans", 12))
+        self.bullets_box.setMaximumHeight(110)
+        self.bullets_box.setMinimumHeight(80)
+        self.bullets_box.setStyleSheet("""
+            QTextEdit {
+                background-color: rgba(240, 247, 255, 240);
+                color: #1a3a5c;
+                border: 1px solid #b8d4e8;
+                border-radius: 4px;
+                padding: 8px;
+            }
+        """)
+        answer_outer.addWidget(self.bullets_box)
+
+        script_header = QLabel("Full Answer")
+        script_header.setFont(QFont("Sans", 9, QFont.Weight.Bold))
+        script_header.setStyleSheet("color: #555555; padding: 0 2px;")
+        answer_outer.addWidget(script_header)
+
         self.answer_box = FitTextEdit(initial_font_size=16, min_font_size=10)
-        self.answer_box.setPlaceholderText("Answer will appear here...")
+        self.answer_box.setPlaceholderText("Full speakable answer streams here...")
         self.answer_box.setStyleSheet("""
             QTextEdit {
                 background-color: rgba(255, 255, 255, 240);
@@ -1180,10 +1210,17 @@ class AstraWindow(QMainWindow):
             return
 
         current_q = self.question_display.text()
-        current_a = self.answer_box.toPlainText()
+        current_script = self.answer_box.toPlainText()
+        current_bullets = self.bullets_box.toPlainText()
 
-        if not current_q or current_q == "Waiting for question..." or not current_a:
+        if not current_q or current_q == "Waiting for question..." or (not current_script and not current_bullets):
             return
+
+        # Combine for history display
+        if current_bullets and current_script:
+            current_a = f"{current_script}\n\n--- Quick Points ---\n{current_bullets}"
+        else:
+            current_a = current_script or current_bullets
 
         entry = {"question": current_q, "answer": current_a}
         self.qa_history.append(entry)
@@ -1252,6 +1289,7 @@ class AstraWindow(QMainWindow):
     def _show_history_entry(self, entry: dict):
         """Show a historical Q&A in the right pane."""
         self.question_display.setText(entry["question"])
+        self.bullets_box.clear()
         self.answer_box.clear()
         self.answer_box.reset_font()
         self.answer_box.setPlainText(entry["answer"])
@@ -1438,29 +1476,43 @@ class AstraWindow(QMainWindow):
         RELIABILITY: This method is the core interview loop. Every code path
         must reset is_processing and restore state to LISTENING so the app
         can keep answering questions even after transient failures.
+
+        LATENCY: Classification and context search run in parallel since
+        they are independent — this saves ~2-3s per question.
         """
         try:
-            # Guard against capture being None (device disconnected)
             if self.capture is None:
                 return
 
-            # Get recent audio (last few seconds based on speech duration)
             audio = self.capture.get_last_n_seconds(10)
 
             if len(audio) == 0:
                 return
 
-            # Transcribe
             text = transcribe_audio(audio)
 
             if not text or not text.strip():
                 return
 
-            # Update last heard
             self.signals.last_heard_update.emit(text, "")
 
-            # Classify if it's an interview question
-            classification = classify_utterance(text, MIN_WORDS_FOR_CLASSIFICATION)
+            # Run classification and context search IN PARALLEL
+            classification_result = [None]
+            context_result = [None]
+
+            def do_classify():
+                classification_result[0] = classify_utterance(text, MIN_WORDS_FOR_CLASSIFICATION)
+
+            def do_search():
+                context_result[0] = search_context(text)
+
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                classify_future = executor.submit(do_classify)
+                search_future = executor.submit(do_search)
+                classify_future.result(timeout=15)
+                search_future.result(timeout=15)
+
+            classification = classification_result[0]
 
             if not classification["is_interview_question"]:
                 self.signals.last_heard_update.emit(text, "ignored")
@@ -1470,18 +1522,16 @@ class AstraWindow(QMainWindow):
                 self.signals.last_heard_update.emit(text, "low_confidence")
                 return
 
-            # It's an interview question with sufficient confidence - generate answer
             self.signals.last_heard_update.emit(text, "answering")
             self.signals.state_changed.emit(ListeningState.GENERATING)
 
-            # Use cleaned question from classifier
             question = classification.get("cleaned_question", text)
             self.signals.transcription_ready.emit(question)
 
-            # Save old Q&A, set new question, then clear and generate
             self.signals.question_update.emit(question)
             self.signals.answer_clear.emit()
-            self._generate_parallel(question)
+            # Pass pre-fetched context chunks to avoid duplicate embedding calls
+            self._generate_parallel(question, context_chunks=context_result[0])
             self.signals.answer_done.emit()
 
         except Exception as e:
@@ -1491,7 +1541,6 @@ class AstraWindow(QMainWindow):
             self.is_processing = False
             self.signals.state_changed.emit(ListeningState.LISTENING)
 
-            # Check if there are queued questions
             if not self.question_queue.empty():
                 self.signals.queue_update.emit(self.question_queue.qsize())
 
@@ -1510,7 +1559,6 @@ class AstraWindow(QMainWindow):
     def _process_audio(self):
         """Background thread: transcribe and get answer."""
         try:
-            # Get last 30 seconds of audio
             self.signals.status_update.emit("Status: Transcribing last 30 seconds...")
             audio = self.capture.get_last_n_seconds(30)
 
@@ -1526,12 +1574,15 @@ class AstraWindow(QMainWindow):
 
             self.signals.transcription_ready.emit(text)
 
-            # Save old Q&A, set new question, then clear and generate
+            # Search context once, share with both generators
+            self.signals.status_update.emit("Status: Searching context...")
+            chunks = search_context(text)
+
             self.signals.question_update.emit(text)
             self.signals.answer_clear.emit()
 
             self.signals.status_update.emit("Status: Generating answers...")
-            self._generate_parallel(text)
+            self._generate_parallel(text, context_chunks=chunks)
 
             self.signals.answer_done.emit()
 
@@ -1541,22 +1592,28 @@ class AstraWindow(QMainWindow):
             # ALWAYS re-enable buttons so the user can retry
             self.signals.answer_done.emit()
 
-    def _generate_parallel(self, question: str):
-        """Generate bullet and script responses in parallel threads."""
-        # Get settings from UI
+    def _generate_parallel(self, question: str, context_chunks: list[dict] | None = None):
+        """Generate bullet and script responses in parallel threads.
+
+        If context_chunks is provided, skips redundant context search.
+        """
         job_context = self.job_context_input.text().strip()
         tone = self.tone_combo.currentData() or "professional"
 
+        # Search once if not pre-fetched
+        if context_chunks is None:
+            context_chunks = search_context(question)
+
         def stream_bullets():
             try:
-                for token in ask_bullet(question, job_context):
+                for token in generate_bullet_response(question, context_chunks, job_context):
                     self.signals.bullet_token.emit(token)
             except Exception as e:
                 self.signals.error_occurred.emit(f"Bullet generation error: {e}")
 
         def stream_script():
             try:
-                for token in ask_script(question, job_context, tone):
+                for token in generate_script_response(question, context_chunks, job_context, tone):
                     self.signals.script_token.emit(token)
             except Exception as e:
                 self.signals.error_occurred.emit(f"Script generation error: {e}")
@@ -1638,13 +1695,7 @@ class AstraWindow(QMainWindow):
         self.answer_box.insertPlainText(token)
 
     def _on_answer_done(self):
-        """Processing complete — append buffered bullets and finalize."""
-        # Append bullet points below the script
-        if self._bullet_buffer.strip():
-            separator = "\n\n━━━━━━━━━━━━━━━━━━━━\n📌 Key Points:\n"
-            self.answer_box.moveCursor(QTextCursor.MoveOperation.End)
-            self.answer_box.insertPlainText(separator + self._bullet_buffer)
-
+        """Processing complete — finalize fonts."""
         self.answer_box.finalize_content()
 
         if self.is_listening:
@@ -1657,14 +1708,17 @@ class AstraWindow(QMainWindow):
         self.level_bar.setValue(0)
 
     def _on_answer_clear(self):
-        """Clear answer box and reset bullet buffer (thread-safe via signal)."""
+        """Clear both panes (thread-safe via signal)."""
+        self.bullets_box.clear()
         self.answer_box.clear()
         self.answer_box.reset_font()
         self._bullet_buffer = ""
 
     def _on_bullet_token(self, token: str):
-        """Buffer bullet tokens (appended to answer_box when done)."""
+        """Stream bullet token to bullets_box — visible immediately for fast feedback."""
         self._bullet_buffer += token
+        self.bullets_box.moveCursor(QTextCursor.MoveOperation.End)
+        self.bullets_box.insertPlainText(token)
 
     def _on_script_token(self, token: str):
         """Append script token to answer_box (visible immediately)."""
@@ -1831,6 +1885,11 @@ class AstraWindow(QMainWindow):
         event.accept()
 
 
+class _UpdateSignals(QObject):
+    """Bridge for cross-thread update prompt."""
+    update_available = pyqtSignal(str, str)  # latest_version, download_url
+
+
 class AstraApp:
     """Application controller managing screen transitions."""
 
@@ -1849,6 +1908,69 @@ class AstraApp:
 
         # Subprocess for background ingestion (crash-isolated from GUI)
         self._ingest_process = None
+
+        # Keep-warm timer: ping Render every 14 min to prevent cold starts
+        self._keep_warm_timer = QTimer()
+        self._keep_warm_timer.timeout.connect(self._ping_backend)
+        self._keep_warm_timer.start(14 * 60 * 1000)
+        # Initial ping on startup to wake the backend immediately
+        threading.Thread(target=self._ping_backend_sync, daemon=True).start()
+
+        # Update check (cross-thread signal so dialog runs on main thread)
+        self._update_signals = _UpdateSignals()
+        self._update_signals.update_available.connect(self._show_update_prompt)
+        self._update_prompted = False
+        threading.Thread(target=self._check_for_update, daemon=True).start()
+
+    def _ping_backend(self):
+        """Fire-and-forget health ping to keep Render instance warm."""
+        threading.Thread(target=self._ping_backend_sync, daemon=True).start()
+
+    @staticmethod
+    def _ping_backend_sync():
+        try:
+            proxy_url = get_proxy_url()
+            base = proxy_url.rsplit("/v1", 1)[0]
+            requests.get(f"{base}/health", timeout=10)
+        except Exception:
+            pass
+
+    def _check_for_update(self):
+        """Background: ask backend for latest version, emit signal if newer."""
+        try:
+            base = get_proxy_url().rsplit("/v1", 1)[0]
+            resp = requests.get(f"{base}/version", timeout=10)
+            if resp.status_code != 200:
+                return
+            data = resp.json()
+            latest = data.get("latest", "")
+            url = data.get("download_url", "")
+            if latest and parse_version(latest) > parse_version(ASTRA_VERSION):
+                self._update_signals.update_available.emit(latest, url)
+        except Exception:
+            pass
+
+    def _show_update_prompt(self, latest: str, url: str):
+        """Show update notification dialog (runs on main thread via signal)."""
+        if self._update_prompted:
+            return
+        self._update_prompted = True
+
+        msg = QMessageBox()
+        msg.setWindowTitle("Update Available")
+        msg.setIcon(QMessageBox.Icon.Information)
+        msg.setText(
+            f"A new version of Astra is available.\n\n"
+            f"Your version: {ASTRA_VERSION}\n"
+            f"Latest version: {latest}\n\n"
+            f"Click Download to get the update."
+        )
+        download_btn = msg.addButton("Download", QMessageBox.ButtonRole.AcceptRole)
+        msg.addButton("Later", QMessageBox.ButtonRole.RejectRole)
+        msg.exec()
+
+        if msg.clickedButton() == download_btn and url:
+            QDesktopServices.openUrl(QUrl(url))
 
     def _on_license_activated(self):
         """Handle successful license activation."""
